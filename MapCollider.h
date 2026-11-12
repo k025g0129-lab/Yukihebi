@@ -1,31 +1,113 @@
 #pragma once
 
-#include "GameMath.h"
-#include "MapChipField.h"
+#include <KamataEngine.h>
+#include <cstdint>
+#include <vector>
 
-// 球と箱ローカルの直方体・三角柱の共通判定。表示階層は参照しない。
+#include "GameMath.h"
+
+using namespace KamataEngine;
+
+class MapChipField;
+
 class MapCollider {
 public:
-	// 判定結果はすべて箱ローカル。CheckSphereがtrueの場合に参照する。
-	struct Contact {
-		// ブロックから球へ向く単位法線。押し出しと反発の方向。
-		Vector3 normal{};
-		// ブロック上の接触点。Stageがこの点の面の速度を求める。
-		Vector3 point{};
-		// 球を外へ出す距離。余裕のcontactMarginはPlayer側で加える。
-		float penetration = 0.0f;
+	enum Corner {
+		kTopLeft,
+		kTopRight,
+		kBottomLeft,
+		kBottomRight,
+		kNumCorners,
 	};
-	// 坂は三角柱、それ以外は直方体として判定する。中心が内部に入った場合も扱う。
-	static bool CheckSphere(const Vector3& center, float radius, const MapBlock& block, Contact& contact);
-	// こちらの引数はワールド座標。並進速度と角速度を接触の力積で更新する。
-	// 戻り値は法線方向の力積。0なら面から離れる方向で、反発も摩擦も加えていない。
-	// 物理の計算は変わらない。当たりの強さを演出へ渡すために返す。
-	static float ResolveVelocity(Vector3& velocity, Vector3& angularVelocity, const Vector3& normal,
-		const Vector3& surfaceVelocity, const GameSettings& settings);
-	// 面ごとの反発を指定する。既存の呼び出しではsettings.restitutionを使用する。
-	static float ResolveVelocity(Vector3& velocity, Vector3& angularVelocity, const Vector3& normal,
-		const Vector3& surfaceVelocity, const GameSettings& settings, float contactRestitution);
-	// 氷床など、面ごとに摩擦も指定する場合。既存の呼び出しは共通の摩擦を使う。
-	static float ResolveVelocity(Vector3& velocity, Vector3& angularVelocity, const Vector3& normal,
-		const Vector3& surfaceVelocity, const GameSettings& settings, float contactRestitution, float friction);
+
+	static constexpr float kBlank = 0.01f;
+	static constexpr float kGroundProbeDepth = 0.05f;
+	static constexpr float kEpsilon = 0.00001f;
+
+	struct Settings {
+		float skin = kBlank;
+		float maxGroundAngle = kPi * 0.25f; // 45度
+		int maxOverlapIterations = 8;
+		int maxMoveIterations = 8;
+	};
+
+	struct MoveOptions {
+		// 接地中の歩行や滑走で、地面の傾きに沿って移動するときに使う。
+		bool followGround = false;
+		Vector3 groundNormal{0.0f, 1.0f, 0.0f};
+
+		bool allowGroundSnap = false;
+		float groundSnapDistance = kGroundProbeDepth;
+
+		// 0なら滑る・止まる。1なら法線方向の速さを保って跳ねる。
+		float restitution = 0.0f;
+		float minBounceSpeed = 0.0f;
+		float deltaTime = 1.0f / kFramesPerSecond;
+	};
+
+	struct Contact {
+		// 地形から移動物体へ向かう法線。
+		Vector3 normal{};
+		Vector3 center{}; // 接触した時点の物体中心
+		// 接触時の矩形上の代表点。粒子の発生位置に使う。
+		Vector3 point{};
+
+		uint32_t xIndex = 0;
+		uint32_t yIndex = 0;
+
+		float time = 0.0f; // このフレーム内の接触時刻、0～1
+		Vector3 incomingVelocity{}; // 接触直前の速度、毎秒単位
+		float impactSpeed = 0.0f; // 面へ向かう速度、毎秒単位
+		float restitution = 0.0f;
+
+		// 初期めり込みの補正。衝突エフェクトには使わない。
+		bool correctionOnly = false;
+	};
+
+	struct Result {
+		bool ceiling = false;
+		bool landing = false;
+		bool wall = false;
+
+		Vector3 movement{};
+		std::vector<Contact> contacts;
+
+		bool grounded = false;
+		Vector3 groundNormal{0.0f, 1.0f, 0.0f};
+		bool iterationLimit = false;
+	};
+
+	struct GroundResult {
+		bool hit = false;
+		Vector3 normal{0.0f, 1.0f, 0.0f};
+		Vector3 movement{};
+	};
+
+	void SetMapChipField(MapChipField* field) { mapChipField_ = field; }
+
+	void SetSize(float width, float height) {
+		width_ = width;
+		height_ = height;
+	}
+
+	void SetSettings(const Settings& settings) { settings_ = settings; }
+
+	bool IsWalkableSurface(const Vector3& normal) const;
+
+	Result Check(const Vector3& center, const Vector3& movement);
+	Result Check(const Vector3& center, const Vector3& movement, const MoveOptions& options);
+
+	GroundResult ProbeGround(const Vector3& center, float distance) const;
+	bool IsOnGround(const Vector3& center) const;
+
+	// 既存APIを使う箇所のため残す。
+	Vector3 CornerPosition(const Vector3& center, Corner corner) const;
+
+	static Vector3 ResolveVelocity(const Vector3& velocity, const Contact& contact);
+
+private:
+	MapChipField* mapChipField_ = nullptr;
+	float width_ = 0.8f;
+	float height_ = 0.8f;
+	Settings settings_{};
 };

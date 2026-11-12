@@ -1,160 +1,563 @@
-﻿#include "MapCollider.h"
+#include "MapCollider.h"
+#include "MapChipField.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <limits>
 
 namespace {
-	// 三角柱の断面上で、点から線分への最近点を求める。
-	Vector3 ClosestOnSegment(const Vector3& point, const Vector3& a, const Vector3& b) {
-		const Vector3 edge = b - a;
-		const float lengthSquared = LengthSquared(edge);
-		const float t = lengthSquared > 0.0f ? std::clamp(Dot(point - a, edge) / lengthSquared, 0.0f, 1.0f) : 0.0f;
-		return a + edge * t;
+	constexpr float kEpsilon = MapCollider::kEpsilon;
+
+	struct Shape {
+		std::array<Vector3, 4> vertices{};
+		size_t count = 0;
+		uint32_t xIndex = 0;
+		uint32_t yIndex = 0;
+	};
+
+	struct Axes {
+		// 移動する矩形のX・Y軸 + 地形の最大4辺。
+		std::array<Vector3, 6> values{};
+		size_t count = 2;
+	};
+
+	struct HitBatch {
+		bool hit = false;
+		float time = 1.0f;
+		std::vector<MapCollider::Contact> contacts;
+	};
+
+	struct Overlap {
+		bool hit = false;
+		float depth = 0.0f;
+		MapCollider::Contact contact{};
+	};
+
+	//bool MakeShape(MapChipField& field, uint32_t x, uint32_t y, Shape& shape) {
+	//	shape = {};
+	//	shape.xIndex = x;
+	//	shape.yIndex = y;
+
+	//	if (MapChipField::IsSolid(field.GetMapChipTypeByIndex(x, y))) {
+	//		const auto rect = field.GetRectByIndex(x, y);
+
+	//		shape.vertices = {
+	//			Vector3{rect.left, rect.bottom, 0.0f},
+	//			Vector3{rect.right, rect.bottom, 0.0f},
+	//			Vector3{rect.right, rect.top, 0.0f},
+	//			Vector3{rect.left, rect.top, 0.0f},
+	//		};
+	//		shape.count = 4;
+	//		return true;
+	//	}
+
+	//	MapChipField::SlopeShape slope;
+	//	if (!field.TryGetSlopeShape(x, y, slope)) {
+	//		return false;
+	//	}
+
+	//	std::copy(slope.vertices.begin(), slope.vertices.end(), shape.vertices.begin());
+
+	//	shape.count = 3;
+	//	return true;
+	//}
+
+	Axes MakeAxes(const Shape& shape) {
+		Axes axes;
+		axes.values[0] = {1.0f, 0.0f, 0.0f};
+		axes.values[1] = {0.0f, 1.0f, 0.0f};
+
+		for (size_t i = 0; i < shape.count; ++i) {
+			const Vector3 edge = shape.vertices[(i + 1) % shape.count] - shape.vertices[i];
+
+			axes.values[axes.count++] = Normalize(Vector3{-edge.y, edge.x, 0.0f});
+		}
+
+		return axes;
 	}
 
-	bool CheckRampSphere(const Vector3& center, float radius, const MapBlock& block, MapCollider::Contact& contact) {
-		const Vector3 local = InverseRotateVector(center - block.center, block.localRotation);
-		const float half = block.halfSize.x;
-		const float rise = block.halfSize.y * 2.0f;
-		const float slope = rise / (half * 2.0f);
-		const float slopeLength = std::sqrt(1.0f + slope * slope);
-		const bool inside = local.x >= -half && local.x <= half && local.y >= 0.0f &&
-			local.y <= (local.x + half) * slope && std::abs(local.z) <= block.halfSize.z;
-		Vector3 nearest{};
-		Vector3 normal{};
-		float penetration = 0.0f;
-		if (inside) {
-			// 球心が内部なら、最も近い面の外向き法線で押し出す。
-			const float distances[] = {((local.x + half) * slope - local.y) / slopeLength,
-				local.y, half - local.x,
-				block.halfSize.z + local.z, block.halfSize.z - local.z};
-			const Vector3 normals[] = {{-slope / slopeLength, 1.0f / slopeLength, 0},
-				{0, -1, 0}, {1, 0, 0}, {0, 0, -1}, {0, 0, 1}};
-			int face = 0;
-			for (int i = 1; i < 5; ++i) {
-				if (distances[i] < distances[face]) { face = i; }
-			}
-			normal = normals[face];
-			nearest = local + normal * distances[face];
-			penetration = radius + distances[face];
-		} else {
-			// 押し出し側面も含め、三角形断面の3辺と奥行きから最近点を作る。
-			const Vector3 point{local.x, local.y, 0.0f};
-			const Vector3 a{-half, 0.0f, 0.0f};
-			const Vector3 b{half, 0.0f, 0.0f};
-			const Vector3 c{half, rise, 0.0f};
-			const bool insideSection = local.x >= -half && local.x <= half && local.y >= 0.0f &&
-				local.y <= (local.x + half) * slope;
-			Vector3 sectionPoint = point;
-			if (!insideSection) {
-				sectionPoint = ClosestOnSegment(point, a, b);
-				const Vector3 highSide = ClosestOnSegment(point, b, c);
-				const Vector3 slopeTop = ClosestOnSegment(point, c, a);
-				if (LengthSquared(highSide - point) < LengthSquared(sectionPoint - point)) { sectionPoint = highSide; }
-				if (LengthSquared(slopeTop - point) < LengthSquared(sectionPoint - point)) { sectionPoint = slopeTop; }
-			}
-			nearest = {sectionPoint.x, sectionPoint.y,
-				std::clamp(local.z, -block.halfSize.z, block.halfSize.z)};
-			const Vector3 difference = local - nearest;
-			const float distanceSquared = LengthSquared(difference);
-			if (distanceSquared > radius * radius) { return false; }
-			const float distance = std::sqrt(distanceSquared);
-			if (distance > 0.000001f) {
-				normal = difference / distance;
-				penetration = radius - distance;
-			} else {
-				// 境界上では外側の面を選ぶ。ゼロ法線での速度解決を避ける。
-				normal = local.z >= 0.0f ? Vector3{0, 0, 1} : Vector3{0, 0, -1};
-				penetration = radius;
+	void Project(const Shape& shape, const Vector3& axis, float& minimum, float& maximum) {
+		minimum = Dot(shape.vertices[0], axis);
+		maximum = minimum;
+
+		for (size_t i = 1; i < shape.count; ++i) {
+			const float value = Dot(shape.vertices[i], axis);
+			minimum = (std::min)(minimum, value);
+			maximum = (std::max)(maximum, value);
+		}
+	}
+
+	// 接地面の余白は上下方向にだけ設ける。全方向へ skin を足すと、
+	// 斜面と隣のブロック上面がつながる手前で側面へ先に当たってしまう。
+	float BoxRadius(const Vector3& half, const Vector3& axis, float skin) {
+		return half.x * std::abs(axis.x) + (half.y + skin) * std::abs(axis.y);
+	}
+
+	// 開始位置から終了位置までに触れうるマスだけ列挙する。
+	// マップ外の負の番号をuint32_tへ変換しない。
+	template <class Callback>
+	void ForEachShape(MapChipField& field, const Vector3& start, const Vector3& end, const Vector3& half, float skin,
+	                  Callback callback) {
+		(void)(callback);
+		constexpr float width = MapChipField::kBlockWindth;
+		constexpr float height = MapChipField::kBlockHeight;
+
+		const int columns = static_cast<int>(field.GetNumBlockHorizontal());
+		const int rows = static_cast<int>(field.GetNumBlockVirtical());
+
+		const float mapTop = (static_cast<float>(rows) - 0.5f) * height;
+
+		const float left = (std::min)(start.x, end.x) - half.x - skin;
+		const float right = (std::max)(start.x, end.x) + half.x + skin;
+		const float bottom = (std::min)(start.y, end.y) - half.y - skin;
+		const float top = (std::max)(start.y, end.y) + half.y + skin;
+
+		int x0 = static_cast<int>(std::floor((left + width * 0.5f) / width));
+		int x1 = static_cast<int>(std::floor((right + width * 0.5f) / width));
+
+		int y0 = static_cast<int>(std::floor((mapTop - top) / height));
+		int y1 = static_cast<int>(std::floor((mapTop - bottom) / height));
+
+		x0 = (std::max)(x0, 0);
+		x1 = (std::min)(x1, columns - 1);
+		y0 = (std::max)(y0, 0);
+		y1 = (std::min)(y1, rows - 1);
+
+		for (int y = y0; y <= y1; ++y) {
+			for (int x = x0; x <= x1; ++x) {
+				Shape shape;
+
+				//if (MakeShape(field, static_cast<uint32_t>(x), static_cast<uint32_t>(y), shape)) {
+				//	callback(shape);
+				//}
 			}
 		}
-		contact.normal = RotateVector(normal, block.localRotation);
-		contact.point = block.center + RotateVector(nearest, block.localRotation);
-		contact.penetration = penetration;
-		return true;
-	}
-}
-
-bool MapCollider::CheckSphere(const Vector3& center, float radius, const MapBlock& block, Contact& contact) {
-	if (block.kind == MapBlockKind::kRamp) { return CheckRampSphere(center, radius, block, contact); }
-	// 通常ブロックは直方体として判定する。
-	const Vector3 localCenter = InverseRotateVector(center - block.center, block.localRotation);
-	const Vector3 minimum = -block.halfSize;
-	const Vector3 maximum = block.halfSize;
-	// 球中心の各成分を直方体の範囲へclampすると、直方体上の最近点になる。
-	const Vector3 nearestPoint = {std::clamp(localCenter.x, minimum.x, maximum.x),
-		std::clamp(localCenter.y, minimum.y, maximum.y), std::clamp(localCenter.z, minimum.z, maximum.z)};
-	const Vector3 difference = localCenter - nearestPoint;
-	const float distanceSquared = LengthSquared(difference);
-	// 最近点までの距離が半径より大きければ非接触。平方距離で比較してsqrtを避ける。
-	if (distanceSquared > radius * radius) { return false; }
-	// 中心が外側なら最近点から中心への方向を法線にする。
-	// 中心が面上・内部なら差がほぼ0になるので、下の最近面を探す処理へ進む。
-	if (distanceSquared > 0.00000001f) {
-		const float distance = std::sqrt(distanceSquared);
-		contact.normal = RotateVector(difference / distance, block.localRotation);
-		contact.point = block.center + RotateVector(nearestPoint, block.localRotation);
-		contact.penetration = radius - distance;
-		return true;
 	}
 
-	// 球の中心まで内部へ入った場合は、最も近い面へ押し出す。
-	// 6面への距離の並びはnormals配列と対応する。最も近い面を選ぶ。
-	const float distances[] = {localCenter.x - minimum.x, maximum.x - localCenter.x,
-		localCenter.y - minimum.y, maximum.y - localCenter.y, localCenter.z - minimum.z, maximum.z - localCenter.z};
-	const Vector3 normals[] = {{-1,0,0}, {1,0,0}, {0,-1,0}, {0,1,0}, {0,0,-1}, {0,0,1}};
-	int nearest = 0;
-	for (int index = 1; index < 6; ++index) {
-		if (distances[index] < distances[nearest]) { nearest = index; }
+	// 開始時点ですでにめり込んでいるかを調べる。
+	Overlap CheckOverlap(const Shape& shape, const Vector3& center, const Vector3& half, float skin) {
+		Overlap result;
+		result.depth = (std::numeric_limits<float>::max)();
+
+		const Axes axes = MakeAxes(shape);
+
+		for (size_t i = 0; i < axes.count; ++i) {
+			const Vector3 axis = axes.values[i];
+
+			float minimum;
+			float maximum;
+			Project(shape, axis, minimum, maximum);
+
+			const float c = Dot(center, axis);
+			const float radius = BoxRadius(half, axis, skin);
+
+			// どちら側へ押すと地形の外へ出るか。
+			const float positive = maximum + radius - c;
+			const float negative = c - (minimum - radius);
+
+			if (positive <= kEpsilon || negative <= kEpsilon) {
+				return {};
+			}
+
+			const float depth = (std::min)(positive, negative);
+
+			if (depth < result.depth) {
+				result.depth = depth;
+				result.contact.normal = positive < negative ? axis : -axis;
+			}
+		}
+
+		result.hit = true;
+		result.contact.xIndex = shape.xIndex;
+		result.contact.yIndex = shape.yIndex;
+		result.contact.correctionOnly = true;
+		return result;
 	}
-	contact.normal = RotateVector(normals[nearest], block.localRotation);
-	contact.point = block.center + RotateVector(localCenter + normals[nearest] * distances[nearest], block.localRotation);
-	// 中心から面までの距離に球半径を足して、球全体を外へ出す。
-	contact.penetration = radius + distances[nearest];
-	return true;
+
+	Overlap FindOverlap(MapChipField& field, const Vector3& center, const Vector3& half, float skin) {
+		Overlap best;
+
+		ForEachShape(field, center, center, half, skin, [&](const Shape& shape) {
+			const Overlap current = CheckOverlap(shape, center, half, skin);
+
+			if (current.hit && (!best.hit || current.depth > best.depth)) {
+				best = current;
+			}
+		});
+
+		return best;
+	}
+
+	// 動く矩形と、静止した凸形状の接触時刻を求める。
+	// 各判定軸で重なる時間帯を求め、その共通部分を見る。
+	bool SweepShape(const Shape& shape, const Vector3& center, const Vector3& movement, const Vector3& half, float skin,
+	                float& time, Vector3& normal) {
+		float enter = -std::numeric_limits<float>::infinity();
+		float leave = std::numeric_limits<float>::infinity();
+
+		const Axes axes = MakeAxes(shape);
+
+		for (size_t i = 0; i < axes.count; ++i) {
+			const Vector3 axis = axes.values[i];
+
+			float minimum;
+			float maximum;
+			Project(shape, axis, minimum, maximum);
+
+			const float radius = BoxRadius(half, axis, skin);
+			minimum -= radius;
+			maximum += radius;
+
+			const float centerOnAxis = Dot(center, axis);
+			const float speedOnAxis = Dot(movement, axis);
+
+			if (std::abs(speedOnAxis) <= kEpsilon) {
+				// この軸では平行移動している。
+				// 境界に触れているだけなら衝突としない。
+				if (centerOnAxis <= minimum + kEpsilon || centerOnAxis >= maximum - kEpsilon) {
+					return false;
+				}
+				continue;
+			}
+
+			float nearTime = (minimum - centerOnAxis) / speedOnAxis;
+			float farTime = (maximum - centerOnAxis) / speedOnAxis;
+
+			if (nearTime > farTime) {
+				std::swap(nearTime, farTime);
+			}
+
+			const Vector3 candidateNormal = speedOnAxis > 0.0f ? -axis : axis;
+			const bool slopeSurfaceAtCorner =
+				shape.count == 3 && i >= 2 &&
+				std::abs(nearTime - enter) <= kEpsilon &&
+				std::abs(candidateNormal.x) > kEpsilon &&
+				candidateNormal.y > 0.0f &&
+				candidateNormal.y > normal.y + kEpsilon;
+			// 平地から斜面へ入る角では、X軸と斜面の接触時刻が一致する。
+			// X軸を壁として選ぶと上れないので、同時なら斜面の法線を使う。
+			if (nearTime > enter + kEpsilon || slopeSurfaceAtCorner) {
+				normal = candidateNormal;
+			}
+			enter = (std::max)(enter, nearTime);
+
+			leave = (std::min)(leave, farTime);
+
+			if (enter >= leave) {
+				return false;
+			}
+		}
+
+		// 開始時のめり込みはCheckOverlapが担当する。
+		// 離れる接触や、角を一瞬かすめるだけの接触は除外する。
+		if (enter < -kEpsilon || enter > 1.0f || leave <= 0.0f) {
+			return false;
+		}
+
+		time = (std::max)(0.0f, enter);
+		return LengthSquared(normal) > 0.0f;
+	}
+
+	HitBatch FindHits(MapChipField& field, const Vector3& center, const Vector3& movement, const Vector3& half,
+	                  float skin) {
+		HitBatch best;
+
+		ForEachShape(field, center, center + movement, half, skin, [&](const Shape& shape) {
+			float time = 1.0f;
+			Vector3 normal{};
+
+			if (!SweepShape(shape, center, movement, half, skin, time, normal)) {
+				return;
+			}
+
+			if (!best.hit || time < best.time - kEpsilon) {
+				best.hit = true;
+				best.time = time;
+				best.contacts.clear();
+			}
+			else if (time < best.time) {
+				best.time = time;
+			}
+
+			// 床と壁へほぼ同時に当たった場合は両方残す。
+			if (std::abs(time - best.time) <= kEpsilon) {
+				MapCollider::Contact contact;
+				contact.normal = normal;
+				contact.xIndex = shape.xIndex;
+				contact.yIndex = shape.yIndex;
+				best.contacts.push_back(contact);
+			}
+		});
+
+		return best;
+	}
+
+	float GetUphillSlopeRise(MapChipField& field, const Vector3& center,
+	                         const Vector3& movement, const Vector3& half,
+	                         float skin, float maxGroundAngle) {
+		if (std::abs(movement.x) <= kEpsilon) {
+			return 0.0f;
+		}
+		const float angle = std::clamp(maxGroundAngle, 0.0f, kPi * 0.5f - 0.01f);
+		const float maxRise = (std::abs(movement.x) + half.x) * std::tan(angle) + skin;
+		float rise = 0.0f;
+
+		// 矩形の前端が斜面に掛かると、中心が斜面のマスへ入る前に上昇が必要になる。
+		// 地面に沿う移動だけに適用し、空中の衝突と垂直な壁は通常判定に任せる。
+		ForEachShape(field, center, center + movement, half, skin, [&](const Shape& shape) {
+			if (shape.count != 3) {
+				return;
+			}
+			for (size_t i = 0; i < shape.count; ++i) {
+				const Vector3 a = shape.vertices[i];
+				const Vector3 b = shape.vertices[(i + 1) % shape.count];
+				const Vector3 edge = b - a;
+				if (std::abs(edge.x) <= kEpsilon || std::abs(edge.y) <= kEpsilon) {
+					continue;
+				}
+				// 頂点は反時計回りなので、辺の右側が地形の外側。
+				const Vector3 normal = Normalize(Vector3{edge.y, -edge.x, 0.0f});
+				if (normal.y <= 0.0f || normal.y + kEpsilon < std::cos(angle) ||
+					movement.x * normal.x >= 0.0f) {
+					continue;
+				}
+				const float frontX = center.x + movement.x -
+					(normal.x > 0.0f ? half.x : -half.x);
+				const float left = (std::min)(a.x, b.x);
+				const float right = (std::max)(a.x, b.x);
+				if (frontX < left - skin || frontX > right + skin) {
+					continue;
+				}
+				const float fraction = std::clamp((frontX - a.x) / edge.x, 0.0f, 1.0f);
+				const float surfaceY = std::lerp(a.y, b.y, fraction);
+				const float neededRise = surfaceY + half.y + skin - center.y;
+				if (neededRise > 0.0f && neededRise <= maxRise + kEpsilon) {
+					rise = (std::max)(rise, neededRise);
+				}
+			}
+		});
+		return rise;
+	}
+} // namespace
+
+bool MapCollider::IsWalkableSurface(const Vector3& normal) const {
+	return normal.y > 0.0f && normal.y + kEpsilon >= std::cos(settings_.maxGroundAngle);
 }
 
-float MapCollider::ResolveVelocity(Vector3& velocity, Vector3& angularVelocity, const Vector3& normal,
-	const Vector3& surfaceVelocity, const GameSettings& settings) {
-	return ResolveVelocity(velocity, angularVelocity, normal, surfaceVelocity, settings, settings.restitution);
+Vector3 MapCollider::CornerPosition(const Vector3& center, Corner corner) const {
+	const Vector3 offsets[kNumCorners] = {
+		{-width_ * 0.5f, height_ * 0.5f, 0.0f},
+		{width_ * 0.5f, height_ * 0.5f, 0.0f},
+		{-width_ * 0.5f, -height_ * 0.5f, 0.0f},
+		{width_ * 0.5f, -height_ * 0.5f, 0.0f},
+	};
+
+	return center + offsets[static_cast<int>(corner)];
 }
 
-float MapCollider::ResolveVelocity(Vector3& velocity, Vector3& angularVelocity, const Vector3& normal,
-	const Vector3& surfaceVelocity, const GameSettings& settings, float contactRestitution) {
-	return ResolveVelocity(velocity, angularVelocity, normal, surfaceVelocity, settings, contactRestitution, settings.friction);
+Vector3 MapCollider::ResolveVelocity(const Vector3& velocity, const Contact& contact) {
+	const float inward = Dot(velocity, contact.normal);
+
+	if (inward >= 0.0f) {
+		return velocity;
+	}
+
+	return velocity - contact.normal * ((1.0f + contact.restitution) * inward);
 }
 
-float MapCollider::ResolveVelocity(Vector3& velocity, Vector3& angularVelocity, const Vector3& normal,
-	const Vector3& surfaceVelocity, const GameSettings& settings, float contactRestitution, float friction) {
-	// 固定床でも回転で動く床でも、球速度 - 面速度の相対速度を使う。
-	Vector3 relative = velocity - surfaceVelocity;
-	const float normalSpeed = Dot(relative, normal);
-	// 面から離れる方向なら反発を加えない。位置のめり込みは呼び出し元で補正済み。
-	if (normalSpeed >= 0.0f) { return 0.0f; }
-	// 十分な速さで近づいた場合だけ反発する。低速接地の小刻みな跳ねを抑える。
-	const float restitution = normalSpeed < -settings.bounceThreshold ? contactRestitution : 0.0f;
-	// 法線方向の速度を反発係数ぶん反転させる力積。力積/質量が速度変化。
-	const float normalImpulse = -(1.0f + restitution) * normalSpeed * settings.ballMass;
-	velocity += normal * (normalImpulse / settings.ballMass);
+MapCollider::GroundResult MapCollider::ProbeGround(const Vector3& center, float distance) const {
+	GroundResult result;
 
-	// 球の接触点の速度も考慮する。摩擦の力積を並進と回転へ分配することで転がる。
-	// 球中心から接触点までの腕。角速度×腕による接触点の回転速度も含める。
-	const Vector3 arm = -normal * settings.ballRadius;
-	relative = velocity - surfaceVelocity + Cross(angularVelocity, arm);
-	// 法線成分を除き、面に沿う滑りの方向と速さを取り出す。
-	const Vector3 tangent = relative - normal * Dot(relative, normal);
-	const float tangentSpeed = Length(tangent);
-	if (tangentSpeed <= 0.000001f) { return normalImpulse; }
-	// 一様な中身の詰まった球の慣性モーメント I = (2/5)mr^2 を仮定する。
-	const float inertia = (2.0f / 5.0f) * settings.ballMass * settings.ballRadius * settings.ballRadius;
-	// 摩擦は並進と回転の両方を変えるため、回転分も含む有効質量を使う。
-	const float inverseEffectiveMass = 1.0f / settings.ballMass + settings.ballRadius * settings.ballRadius / inertia;
-	// 滑りを止めるための力積を、摩擦係数×法線力積までに制限する（クーロン摩擦）。
-	const float frictionImpulse = (std::min)(tangentSpeed / inverseEffectiveMass, friction * normalImpulse);
-	const Vector3 impulse = -tangent * (frictionImpulse / tangentSpeed);
-	velocity += impulse / settings.ballMass;
-	// 摩擦力積で並進を変え、腕×力積によるトルク成分で球を回転させる。
-	angularVelocity += Cross(arm, impulse) / inertia;
-	// 当たりの強さ。呼び出し元がしきい値と比べ、演出を出すかどうかを決める。
-	return normalImpulse;
+	if (mapChipField_ == nullptr || distance <= 0.0f) {
+		return result;
+	}
+
+	const Vector3 half{width_ * 0.5f, height_ * 0.5f, 0.0f};
+	// 接触面からわずかに離して下向きに調べる。境界ちょうどで始まる
+	// SweepShape は丸め誤差で接触を見失うことがある。
+	const float startOffset = settings_.skin + kEpsilon;
+	const Vector3 start = center + Vector3{0.0f, startOffset, 0.0f};
+	const Vector3 movement{0.0f, -(distance + startOffset), 0.0f};
+	float nearestTime = (std::numeric_limits<float>::max)();
+
+	// FindHits は最初に当たった形状だけを返す。斜面とブロックの継ぎ目では
+	// その接触が歩けない面でも、別の形状に地面がある可能性を調べる。
+	ForEachShape(*mapChipField_, start, start + movement, half, settings_.skin, [&](const Shape& shape) {
+		float time = 1.0f;
+		Vector3 normal{};
+		if (!SweepShape(shape, start, movement, half, settings_.skin, time, normal) ||
+			!IsWalkableSurface(normal)) {
+			return;
+		}
+
+		if (!result.hit || time < nearestTime - kEpsilon ||
+			(std::abs(time - nearestTime) <= kEpsilon && normal.y > result.normal.y)) {
+			result.hit = true;
+			result.normal = normal;
+			result.movement = Vector3{0.0f, startOffset, 0.0f} + movement * time;
+			nearestTime = time;
+		}
+	});
+
+	return result;
+}
+
+bool MapCollider::IsOnGround(const Vector3& center) const { return ProbeGround(center, kGroundProbeDepth).hit; }
+
+MapCollider::Result MapCollider::Check(const Vector3& center, const Vector3& movement) {
+	return Check(center, movement, MoveOptions{});
+}
+
+MapCollider::Result MapCollider::Check(const Vector3& center, const Vector3& movement, const MoveOptions& options) {
+	Result result;
+	result.movement = movement;
+
+	if (mapChipField_ == nullptr) {
+		return result;
+	}
+
+	const Vector3 half{width_ * 0.5f, height_ * 0.5f, 0.0f};
+
+	Vector3 position = center;
+	position.z = 0.0f;
+
+	// 最初から地形に埋まっていた場合だけ押し出す。
+	// このContactではダメージ・粒子を出さない。
+	for (int i = 0; i < settings_.maxOverlapIterations; ++i) {
+		const Overlap overlap = FindOverlap(*mapChipField_, position, half, settings_.skin);
+
+		if (!overlap.hit) {
+			break;
+		}
+
+		if (options.followGround && IsWalkableSurface(overlap.contact.normal) &&
+			std::abs(overlap.contact.normal.x) > kEpsilon) {
+			// 坂への浅いめり込みを法線方向へ押すと、X方向にも戻されて上りで詰まる。
+			position.y += (overlap.depth + kEpsilon) / overlap.contact.normal.y;
+		}
+		else {
+			position += overlap.contact.normal * (overlap.depth + kEpsilon);
+		}
+
+		result.contacts.push_back(overlap.contact);
+	}
+
+	if (FindOverlap(*mapChipField_, position, half, settings_.skin).hit) {
+		result.iterationLimit = true;
+		result.movement = position - center;
+		return result;
+	}
+
+	Vector3 remaining = movement;
+	remaining.z = 0.0f;
+
+	if (options.followGround && IsWalkableSurface(options.groundNormal)) {
+		// 操作中の水平移動量を保ったまま、
+		// 接地している面に沿うY移動量を作る。
+		remaining.y = -remaining.x * options.groundNormal.x / options.groundNormal.y;
+		const float uphillRise = GetUphillSlopeRise(
+			*mapChipField_, position, remaining, half,
+			settings_.skin, settings_.maxGroundAngle);
+		if (uphillRise > 0.0f) {
+			remaining.y = (std::max)(remaining.y, uphillRise);
+		}
+	}
+
+	float elapsed = 0.0f;
+
+	for (int i = 0; i < settings_.maxMoveIterations; ++i) {
+		if (LengthSquared(remaining) <= kEpsilon * kEpsilon) {
+			remaining = {};
+			break;
+		}
+
+		const HitBatch hit = FindHits(*mapChipField_, position, remaining, half, settings_.skin);
+
+		if (!hit.hit) {
+			position += remaining;
+			remaining = {};
+			break;
+		}
+
+		const Vector3 incoming = remaining;
+		const float secondsLeft = (1.0f - elapsed) * options.deltaTime;
+
+		position += remaining * hit.time;
+
+		elapsed += (1.0f - elapsed) * hit.time;
+
+		remaining *= 1.0f - hit.time;
+
+		for (Contact contact : hit.contacts) {
+			contact.time = elapsed;
+			contact.center = position;
+			// 法線と反対側の支持点。平面では辺の中央、斜面では角になる。
+			contact.point = position;
+			if (contact.normal.x > kEpsilon) {
+				contact.point.x -= half.x;
+			}
+			else if (contact.normal.x < -kEpsilon) {
+				contact.point.x += half.x;
+			}
+			if (contact.normal.y > kEpsilon) {
+				contact.point.y -= half.y;
+			}
+			else if (contact.normal.y < -kEpsilon) {
+				contact.point.y += half.y;
+			}
+
+			contact.incomingVelocity = secondsLeft > kEpsilon ? incoming / secondsLeft : Vector3{};
+			contact.impactSpeed = (std::max)(0.0f, -Dot(contact.incomingVelocity, contact.normal));
+
+			contact.restitution = contact.impactSpeed >= options.minBounceSpeed ? options.restitution : 0.0f;
+
+			const bool walkable = IsWalkableSurface(contact.normal);
+
+			if (options.followGround && walkable) {
+				// Playerの操作歩行。
+				// 新たに入った斜面の方向へ残りの移動を合わせる。
+				contact.restitution = 0.0f;
+				remaining.y = -remaining.x * contact.normal.x / contact.normal.y;
+			}
+			else {
+				// 空中のPlayerや吹き飛び中のEnemy。
+				remaining = ResolveVelocity(remaining, contact);
+			}
+
+			result.contacts.push_back(contact);
+		}
+	}
+
+	if (LengthSquared(remaining) > kEpsilon * kEpsilon) {
+		result.iterationLimit = true;
+	}
+
+	const float probeDistance = options.allowGroundSnap ? options.groundSnapDistance : kGroundProbeDepth;
+
+	const GroundResult ground = ProbeGround(position, probeDistance);
+
+	result.grounded = ground.hit;
+
+	if (ground.hit) {
+		result.groundNormal = ground.normal;
+
+		if (options.allowGroundSnap) {
+			position += ground.movement;
+		}
+	}
+
+	for (const Contact& contact : result.contacts) {
+		if (contact.correctionOnly) {
+			continue;
+		}
+		result.landing |= IsWalkableSurface(contact.normal);
+
+		result.ceiling |= contact.normal.y < -kEpsilon;
+
+		result.wall |= std::abs(contact.normal.y) <= kEpsilon;
+	}
+
+	result.movement = position - center;
+	return result;
 }
