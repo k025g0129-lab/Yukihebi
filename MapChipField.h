@@ -1,6 +1,5 @@
-﻿#pragma once
+#pragma once
 
-#include "GameSettings.h"
 #include <cstdint>
 #include <iosfwd>
 #include <string>

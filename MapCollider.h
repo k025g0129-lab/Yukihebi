@@ -1,6 +1,5 @@
-﻿#pragma once
+#pragma once
 
-#include "GameSettings.h"
 #include "MapChipField.h"
 
 // 球と箱ローカルの直方体・三角柱の共通判定。表示階層は参照しない。
