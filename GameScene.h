@@ -30,11 +30,11 @@ private:
 
 	Boss* boss;
 
-		Skydome* skydome_ = nullptr;
+		//Skydome* skydome_ = nullptr;
 
-			MapChipField* mapChipField_;
+		//	MapChipField* mapChipField_;
 
-	    CameraController* cameraController;
+	 //   CameraController* cameraController;
 
-	    Fade* fade_ = nullptr;
+	 //   Fade* fade_ = nullptr;
 };

@@ -1,4 +1,5 @@
 #pragma once
+#include "GameMath.h"
 
 #include <cstdint>
 #include <iosfwd>

@@ -34,8 +34,8 @@ void GameScene::Initialize() {
 	AxisIndicator::GetInstance()->SetTargetCamera(&debugCamera_->GetCamera());
 
 	//天球
-	skydome_ = new Skydome();
-	skydome_->Initialize(modelSkydome_, &camera_);
+	//skydome_ = new Skydome();
+	//skydome_->Initialize(modelSkydome_, &camera_);
 
 	//ブロック
 	const uint32_t kNumBlockVirtical = 10;
@@ -49,7 +49,7 @@ void GameScene::Initialize() {
 
 	
 	//マップチップファイル
-	mapChipField_ = new MapChipField();
+	//mapChipField_ = new MapChipField();
 
 
 }
