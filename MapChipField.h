@@ -21,8 +21,8 @@ public:
 	static constexpr float kBlockHeight = 1.0f;
 
 	//blocの個数
-	static constexpr uint32_t kNumBlockVirtical = 30;
-	static constexpr uint32_t kNumBlockHorizontal = 30;
+	static constexpr uint32_t kNumBlockVirtical = 500;
+	static constexpr uint32_t kNumBlockHorizontal = 500;
 
 	// マップチップデータ
 	MapChipDate mapChipDate;

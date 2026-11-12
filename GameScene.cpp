@@ -1,4 +1,4 @@
-#include "GameScene.h"
+﻿#include "GameScene.h"
 
 #include "GameMath.h"
 #include "Player.h"
@@ -6,7 +6,10 @@
 GameScene::GameScene() {
 }
 
-GameScene::~GameScene() = default;
+GameScene::~GameScene() {
+	delete player_;
+	delete playerModel_;
+}
 
 
 void GameScene::Initialize() {
@@ -17,37 +20,13 @@ void GameScene::Initialize() {
 	camera_.UpdateMatrix();
 	camera_.TransferMatrix();
 
-	// 床の配置はマップチップで決める。既存のマップチップ座標は XY 用なので、
-	// 見下ろし用の床では列を X、行を Z へ対応させる。
-	constexpr int32_t kFloorHalfSide = kFloorSide / 2;
+	// CSV のマップチップからブロックを生成する。
 	mapChipField_.LoadMapChipCSV("Resources/floor.csv");
-	floorModel_.reset(Model::CreateFromOBJ("Player"));
-	floorTiles_.clear();
-	floorTiles_.reserve(kFloorSide * kFloorSide);
-	for (uint32_t row = 0; row < kFloorSide; ++row) {
-		for (uint32_t column = 0; column < kFloorSide; ++column) {
-			auto tile = std::make_unique<WorldTransform>();
-			tile->Initialize();
-			// cube.obj は各軸 -1～+1。半径 0.5 で 1 マスの大きさにする。
-			tile->scale_ = {
-				MapChipField::kBlockWindth * 0.5f, 0.05f,
-				MapChipField::kBlockHeight * 0.5f
-			};
-			tile->translation_ = {
-				(static_cast<int32_t>(column) - kFloorHalfSide) * MapChipField::kBlockWindth,
-				-0.05f,
-				(kFloorHalfSide - static_cast<int32_t>(row)) * MapChipField::kBlockHeight
-			};
-			tile->matWorld_ = MakeAffineMatrix(tile->scale_, tile->rotation_, tile->translation_);
-			tile->TransferMatrix();
-			floorTiles_.push_back(std::move(tile));
-		}
-	}
-	floorColor_.Initialize();
-	floorColor_.SetColor({0.35f, 0.4f, 0.45f, 1.0f});
-
-	player_ = std::make_unique<Player>();
-	player_->Initialize(&camera_);
+	modelBlock_.reset(Model::CreateFromOBJ("bloc"));
+	GenerateBlocks();
+	playerModel_ = Model::CreateFromOBJ("Player");
+	player_ = new Player();
+	player_->Initialize(playerModel_, &camera_);
 }
 
 void GameScene::Update() {
@@ -57,13 +36,52 @@ void GameScene::Update() {
 
 void GameScene::Draw() {
 	Model::PreDraw();
-	for (uint32_t row = 0; row < kFloorSide; ++row) {
-		for (uint32_t column = 0; column < kFloorSide; ++column) {
-			if (mapChipField_.GetMapChipTypeByIndex(column, row) == MapChipType::kBlock) {
-				floorModel_->Draw(*floorTiles_[row * kFloorSide + column], camera_, &floorColor_);
+	for (size_t row = 0; row < worldTransformBlocks_.size(); ++row) {
+		for (size_t column = 0; column < worldTransformBlocks_[row].size(); ++column) {
+			const WorldTransform* block = worldTransformBlocks_[row][column].get();
+			if (block == nullptr) {
+				continue;
+			}
+			if (mapChipField_.GetMapChipTypeByIndex(
+					static_cast<uint32_t>(column), static_cast<uint32_t>(row)) == MapChipType::kBlock) {
+				modelBlock_->Draw(*block, camera_);
 			}
 		}
 	}
 	player_->Draw();
 	Model::PostDraw();
+}
+
+void GameScene::GenerateBlocks() {
+	const uint32_t rows = mapChipField_.GetNumBlockVirtical();
+	const uint32_t columns = mapChipField_.GetNumBlockHorizontal();
+	worldTransformBlocks_.clear();
+	worldTransformBlocks_.resize(rows);
+	for (auto& line : worldTransformBlocks_) {
+		line.resize(columns);
+	}
+
+	// MapChipField の位置は XY。見下ろし用に XZ へ写し、9×9 のマップを原点中心に置く。
+	const float centerX = (kFloorSide - 1) * MapChipField::kBlockWindth * 0.5f;
+	const float centerY =
+		(rows - 1 - (kFloorSide - 1) * 0.5f) * MapChipField::kBlockHeight;
+	for (uint32_t row = 0; row < rows; ++row) {
+		for (uint32_t column = 0; column < columns; ++column) {
+			if (mapChipField_.GetMapChipTypeByIndex(column, row) != MapChipType::kBlock) {
+				continue;
+			}
+
+			auto block = std::make_unique<WorldTransform>();
+			block->Initialize();
+			// bloc.obj は -1～+1 の立方体。床一マスの幅と奥行きに合わせる。
+			block->scale_ = {
+				MapChipField::kBlockWindth * 0.5f, 0.05f,
+				MapChipField::kBlockHeight * 0.5f};
+			const Vector3 chipPosition = mapChipField_.GetMapChipPositionByIndex(column, row);
+			block->translation_ = {chipPosition.x - centerX, -0.05f, chipPosition.y - centerY};
+			block->matWorld_ = MakeAffineMatrix(block->scale_, block->rotation_, block->translation_);
+			block->TransferMatrix();
+			worldTransformBlocks_[row][column] = std::move(block);
+		}
+	}
 }
