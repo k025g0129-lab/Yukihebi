@@ -1,4 +1,4 @@
-#include "MapChipField.h"
+﻿#include "MapChipField.h"
 #include <algorithm>
 #include <map>
 
@@ -18,6 +18,7 @@ namespace {
 
 void MapChipField::ResetMapChipData() {
 	loadedBlockHorizontal_ = 0;
+	loadedBlockVirtical_ = 0;
 	mapChipDate.data.clear();
 	mapChipDate.data.resize(kNumBlockVirtical);
 	for (std::vector<MapChipType>& mapchipDataLine : mapChipDate.data) {
@@ -46,6 +47,7 @@ void MapChipField::LoadMapChipCSV(const std::string& filePath) {
 		std::string line;
 		getline(mapChipCsv, line);
 		if (!line.empty()) {
+			loadedBlockVirtical_ = i + 1;
 			const uint32_t columns = static_cast<uint32_t>(std::count(line.begin(), line.end(), ',')) + 1;
 			loadedBlockHorizontal_ = (std::max)(loadedBlockHorizontal_,
 			                                    (std::min)(columns, kNumBlockHorizontal));

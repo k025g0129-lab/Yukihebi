@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <array>
 #include <cstdint>
 #include <string>
@@ -44,6 +44,8 @@ public:
 	uint32_t GetNumBlockHorizontal() { return kNumBlockHorizontal; }
 	// CSV に実際に記載された列数。固定配列の余白を外周扱いしないために使う。
 	uint32_t GetLoadedBlockHorizontal() const { return loadedBlockHorizontal_; }
+	// CSV に実際に記載された行数。
+	uint32_t GetLoadedBlockVirtical() const { return loadedBlockVirtical_; }
 
 	struct Rect {
 		float left;
@@ -76,4 +78,5 @@ public:
 
 private:
 	uint32_t loadedBlockHorizontal_ = 0;
+	uint32_t loadedBlockVirtical_ = 0;
 };
