@@ -1,4 +1,4 @@
-#include "MapCollider.h"
+﻿#include "MapCollider.h"
 #include "MapChipField.h"
 
 #include <algorithm>
@@ -410,6 +410,9 @@ MapCollider::Result MapCollider::Check(const Vector3& center, const Vector3& mov
 }
 
 MapCollider::Result MapCollider::Check(const Vector3& center, const Vector3& movement, const MoveOptions& options) {
+	if (topDownMode_) {
+		return CheckTopDown(center, movement, options);
+	}
 	Result result;
 	result.movement = movement;
 
@@ -559,5 +562,130 @@ MapCollider::Result MapCollider::Check(const Vector3& center, const Vector3& mov
 	}
 
 	result.movement = position - center;
+	return result;
+}
+
+MapCollider::Result MapCollider::CheckTopDown(
+	const Vector3& center, const Vector3& movement, const MoveOptions& options) {
+	Result result;
+	result.movement = movement;
+	if (mapChipField_ == nullptr) {
+		return result;
+	}
+	const int columns = static_cast<int>(mapChipField_->GetLoadedBlockHorizontal());
+	const int rows = static_cast<int>(mapChipField_->GetLoadedBlockVirtical());
+	if (columns == 0 || rows == 0) {
+		return result;
+	}
+
+	const float cellWidth = MapChipField::kBlockWindth;
+	const float cellDepth = MapChipField::kBlockHeight;
+	const float blockHeight = MapChipField::kTopDownBlockThickness;
+	const float floorTop = MapChipField::kTopDownFloorTop;
+	const Vector3 playerHalf{width_ * 0.5f, height_ * 0.5f, width_ * 0.5f};
+	const Vector3 blockHalf{cellWidth * 0.5f, blockHeight * 0.5f, cellDepth * 0.5f};
+	const float centerX = (columns - 1) * cellWidth * 0.5f;
+	const float centerZ = (rows - 1) * cellDepth * 0.5f;
+
+	// 開始点から終了点までの周辺マスだけを衝突候補にする。
+	const float left = (std::min)(center.x, center.x + movement.x) - playerHalf.x - blockHalf.x;
+	const float right = (std::max)(center.x, center.x + movement.x) + playerHalf.x + blockHalf.x;
+	const float back = (std::min)(center.z, center.z + movement.z) - playerHalf.z - blockHalf.z;
+	const float front = (std::max)(center.z, center.z + movement.z) + playerHalf.z + blockHalf.z;
+	const int firstColumn = (std::max)(0, static_cast<int>(std::floor((left + centerX) / cellWidth)) - 1);
+	const int lastColumn = (std::min)(columns - 1, static_cast<int>(std::ceil((right + centerX) / cellWidth)) + 1);
+	const int firstRow = (std::max)(0, static_cast<int>(std::floor((centerZ - front) / cellDepth)) - 1);
+	const int lastRow = (std::min)(rows - 1, static_cast<int>(std::ceil((centerZ - back) / cellDepth)) + 1);
+	Vector3 position = center;
+
+	const auto component = [](const Vector3& value, int axis) {
+		return axis == 0 ? value.x : axis == 1 ? value.y : value.z;
+	};
+	const auto setComponent = [](Vector3& value, int axis, float number) {
+		if (axis == 0) { value.x = number; }
+		else if (axis == 1) { value.y = number; }
+		else { value.z = number; }
+	};
+	const auto overlaps = [](float aCenter, float aHalf, float bCenter, float bHalf) {
+		return aCenter + aHalf > bCenter - bHalf + kEpsilon &&
+		       aCenter - aHalf < bCenter + bHalf - kEpsilon;
+	};
+
+	// 横方向を先に処理し、その位置で上下方向の床・天井を判定する。
+	for (const int axis : {0, 2, 1}) {
+		const float requested = component(movement, axis);
+		if (std::abs(requested) <= kEpsilon) {
+			continue;
+		}
+		float allowed = requested;
+		bool hit = false;
+		Contact contact{};
+		for (int row = firstRow; row <= lastRow; ++row) {
+			for (int column = firstColumn; column <= lastColumn; ++column) {
+				if (mapChipField_->GetMapChipTypeByIndex(
+					static_cast<uint32_t>(column), static_cast<uint32_t>(row)) != MapChipType::kBlock) {
+					continue;
+				}
+				Vector3 blockCenter = mapChipField_->GetTopDownPositionByIndex(
+					static_cast<uint32_t>(column), static_cast<uint32_t>(row));
+				blockCenter.y = floorTop - blockHalf.y;
+				bool otherAxesOverlap = true;
+				for (int other = 0; other < 3; ++other) {
+					if (other != axis && !overlaps(component(position, other), component(playerHalf, other),
+					                              component(blockCenter, other), component(blockHalf, other))) {
+						otherAxesOverlap = false;
+						break;
+					}
+				}
+				if (!otherAxesOverlap) {
+					continue;
+				}
+				const float current = component(position, axis);
+				const float target = component(blockCenter, axis);
+				const float radius = component(playerHalf, axis) + component(blockHalf, axis);
+				const float gap = requested > 0.0f ? target - radius - current : target + radius - current;
+				const bool nearer = requested > 0.0f
+					? gap >= -kEpsilon && gap <= allowed + kEpsilon
+					: gap <= kEpsilon && gap >= allowed - kEpsilon;
+				if (!nearer) {
+					continue;
+				}
+				allowed = requested > 0.0f ? (std::max)(0.0f, gap) : (std::min)(0.0f, gap);
+				hit = true;
+				contact.xIndex = static_cast<uint32_t>(column);
+				contact.yIndex = static_cast<uint32_t>(row);
+			}
+		}
+		setComponent(position, axis, component(position, axis) + allowed);
+		if (hit) {
+			setComponent(contact.normal, axis, requested > 0.0f ? -1.0f : 1.0f);
+			contact.center = position;
+			contact.point = position;
+			contact.time = std::abs(allowed / requested);
+			contact.incomingVelocity = options.deltaTime > kEpsilon ? movement / options.deltaTime : Vector3{};
+			contact.impactSpeed = std::abs(requested) / (std::max)(options.deltaTime, kEpsilon);
+			result.contacts.push_back(contact);
+			result.wall |= axis == 0 || axis == 2;
+			result.landing |= axis == 1 && requested < 0.0f;
+			result.ceiling |= axis == 1 && requested > 0.0f;
+		}
+	}
+	result.movement = position - center;
+	result.grounded = result.landing;
+	if (!result.grounded && std::abs(position.y - playerHalf.y - floorTop) <= kEpsilon) {
+		for (int row = firstRow; row <= lastRow && !result.grounded; ++row) {
+			for (int column = firstColumn; column <= lastColumn; ++column) {
+				if (mapChipField_->GetMapChipTypeByIndex(
+					static_cast<uint32_t>(column), static_cast<uint32_t>(row)) != MapChipType::kBlock) {
+					continue;
+				}
+				const Vector3 blockCenter = mapChipField_->GetTopDownPositionByIndex(
+					static_cast<uint32_t>(column), static_cast<uint32_t>(row));
+				result.grounded = overlaps(position.x, playerHalf.x, blockCenter.x, blockHalf.x) &&
+				                  overlaps(position.z, playerHalf.z, blockCenter.z, blockHalf.z);
+				if (result.grounded) { break; }
+			}
+		}
+	}
 	return result;
 }

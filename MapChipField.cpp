@@ -100,6 +100,14 @@ Vector3 MapChipField::GetMapChipPositionByIndex(uint32_t xIndex, uint32_t yIndex
 	return Vector3(kBlockWindth * xIndex, kBlockHeight * (kNumBlockVirtical - 1 - yIndex), 0);
 }
 
+Vector3 MapChipField::GetTopDownPositionByIndex(uint32_t xIndex, uint32_t yIndex) const {
+	const float centerX = (static_cast<float>(loadedBlockHorizontal_) - 1.0f) * kBlockWindth * 0.5f;
+	const float centerZ = (static_cast<float>(loadedBlockVirtical_) - 1.0f) * kBlockHeight * 0.5f;
+	return {static_cast<float>(xIndex) * kBlockWindth - centerX,
+	        0.0f,
+	        centerZ - static_cast<float>(yIndex) * kBlockHeight};
+}
+
 
 // インデックスから、そのブロックが占める矩形を返す。
 // 当たり判定でめり込み量を求めるのに使う。

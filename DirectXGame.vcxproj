@@ -184,6 +184,7 @@ xcopy "$(ProjectDir)..\External\KamataEngine\shaders" "$(ProjectDir)Resources\En
     <ClCompile Include="MapChipField.cpp" />
     <ClCompile Include="MapCollider.cpp" />
     <ClCompile Include="Player.cpp" />
+    <ClCompile Include="Snow.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="GameMath.h" />
@@ -191,6 +192,7 @@ xcopy "$(ProjectDir)..\External\KamataEngine\shaders" "$(ProjectDir)Resources\En
     <ClInclude Include="MapChipField.h" />
     <ClInclude Include="MapCollider.h" />
     <ClInclude Include="Player.h" />
+    <ClInclude Include="Snow.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
