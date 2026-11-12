@@ -64,6 +64,7 @@ Vector3 Cross(const Vector3& left, const Vector3& right) {
 	};
 }
 
+
 float LengthSquared(const Vector3& value) { return Dot(value, value); }
 
 float Length(const Vector3& value) { return std::sqrt(LengthSquared(value)); }
