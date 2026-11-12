@@ -20,7 +20,6 @@ public:
 private:
 	void GenerateBlocks();
 
-	static constexpr uint32_t kFloorSide = 9;
 	Camera camera_{};
 	MapChipField mapChipField_{};
 	std::vector<std::vector<std::unique_ptr<WorldTransform>>> worldTransformBlocks_;
