@@ -181,10 +181,14 @@ xcopy "$(ProjectDir)..\External\KamataEngine\shaders" "$(ProjectDir)Resources\En
     <ClCompile Include="GameMath.cpp" />
     <ClCompile Include="GameScene.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="MapChipField.cpp" />
+    <ClCompile Include="MapCollider.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="GameMath.h" />
     <ClInclude Include="GameScene.h" />
+    <ClInclude Include="MapChipField.h" />
+    <ClInclude Include="MapCollider.h" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Boss.h" />
