@@ -7,6 +7,7 @@
 using namespace KamataEngine;
 
 class Player;
+class Boss;
 
 class GameScene {
 public:
@@ -26,7 +27,13 @@ private:
 	Model* playerModel_ = nullptr;
 	Model* snowModel_ = nullptr;
 	Player* player_ = nullptr;
+
 	std::chrono::steady_clock::time_point previousTime_{};
 	float snowPhysicsAccumulator_ = 0.0f;
 	static constexpr float kSnowPhysicsStep = 1.0f / 120.0f;
+
+
+	Model* bossModel_ = nullptr;
+	Boss* boss_ = nullptr;
+
 };

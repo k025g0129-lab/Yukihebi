@@ -3,6 +3,7 @@
 #include <algorithm>
 #include "GameMath.h"
 #include "Player.h"
+#include "Boss.h"
 
 GameScene::GameScene() {
 }
@@ -10,6 +11,8 @@ GameScene::GameScene() {
 GameScene::~GameScene() {
 	delete player_;
 	delete playerModel_;
+	delete bossModel_;
+	delete boss_ ;
 }
 
 
@@ -20,18 +23,27 @@ void GameScene::Initialize() {
 	camera_.rotation_ = {1.16f, 0.0f, 0.0f};
 	camera_.UpdateMatrix();
 	camera_.TransferMatrix();
+	
 
 	// CSV のマップチップからブロックを生成する。
 	mapChipField_.LoadMapChipCSV("Resources/floor.csv");
 	modelBlock_.reset(Model::CreateFromOBJ("cube"));
 	GenerateBlocks();
+
 	playerModel_ = Model::CreateFromOBJ("Player");
 	player_ = new Player();
+
 	snowModel_ = Model::CreateFromOBJ("snow");
 	player_->Initialize(playerModel_, snowModel_, &camera_);
 	player_->SetMapChipField(&mapChipField_);
 	previousTime_ = std::chrono::steady_clock::now();
 	snowPhysicsAccumulator_ = 0.0f;
+
+
+	bossModel_ = Model::CreateFromOBJ("Boss");
+	boss_ = new Boss();
+	boss_->Initialize(bossModel_, &camera_,player_);
+
 }
 
 void GameScene::Update() {
@@ -39,11 +51,15 @@ void GameScene::Update() {
 	const float elapsed = +std::chrono::duration<float>(now - previousTime_).count();
 	previousTime_ = now;
 	player_->Update();
+
 	snowPhysicsAccumulator_ += +std::clamp(elapsed, 0.0f, 0.05f);
 	while (snowPhysicsAccumulator_ >= kSnowPhysicsStep) {
 		player_->UpdateSnowPhysics(kSnowPhysicsStep, mapChipField_);
 		snowPhysicsAccumulator_ -= kSnowPhysicsStep;
 	}
+
+	boss_->Update();
+
 }
 
 
@@ -62,6 +78,8 @@ void GameScene::Draw() {
 		}
 	}
 	player_->Draw();
+	boss_->Draw();
+
 	Model::PostDraw();
 }
 

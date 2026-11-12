@@ -34,6 +34,8 @@ public:
 	void SetSpaceRiseSpeed(float speed) { spaceRiseSpeed_ = speed; } // スペースキーで上昇する速度を設定する
 	void SetMaxFallSpeed(float speed) { maxFallSpeed_ = speed; } // 最大落下速度を設定する
 
+	Vector3 GetVector3() { return worldTransform_.translation_; };
+
 private:
 	//==========================
 	// メンバ変数

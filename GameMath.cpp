@@ -1,4 +1,4 @@
-﻿#include "GameMath.h"
+#include "GameMath.h"
 
 #include <algorithm>
 #include <cmath>
@@ -63,6 +63,7 @@ Vector3 Cross(const Vector3& left, const Vector3& right) {
 		left.x * right.y - left.y * right.x,
 	};
 }
+
 
 float LengthSquared(const Vector3& value) { return Dot(value, value); }
 
