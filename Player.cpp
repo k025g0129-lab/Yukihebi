@@ -7,9 +7,9 @@
 Player::Player() = default;
 Player::~Player() = default;
 
-void Player::Initialize(const Camera* camera) {
+void Player::Initialize(Model* moder, const Camera* camera) {
 	camera_ = camera;
-	model_.reset(Model::CreateSphere());
+	model_ = moder;
 	worldTransform_.Initialize();
 	worldTransform_.scale_ = {0.5f, 0.5f, 0.5f};
 	worldTransform_.translation_ = {0.0f, 0.5f, 0.0f};
@@ -50,6 +50,4 @@ void Player::Update() {
 	worldTransform_.TransferMatrix();
 }
 
-void Player::Draw() {
-	model_->Draw(worldTransform_, *camera_, &color_);
-}
+void Player::Draw() { model_->Draw(worldTransform_, *camera_); }
