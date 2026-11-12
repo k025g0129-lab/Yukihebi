@@ -1,5 +1,6 @@
 #include "GameScene.h"
 
+#include <algorithm>
 #include "GameMath.h"
 #include "Player.h"
 #include "Boss.h"
@@ -26,12 +27,18 @@ void GameScene::Initialize() {
 
 	// CSV のマップチップからブロックを生成する。
 	mapChipField_.LoadMapChipCSV("Resources/floor.csv");
-	modelBlock_.reset(Model::CreateFromOBJ("bloc"));
+	modelBlock_.reset(Model::CreateFromOBJ("cube"));
 	GenerateBlocks();
 
 	playerModel_ = Model::CreateFromOBJ("Player");
 	player_ = new Player();
-	player_->Initialize(playerModel_, &camera_);
+
+	snowModel_ = Model::CreateFromOBJ("snow");
+	player_->Initialize(playerModel_, snowModel_, &camera_);
+	player_->SetMapChipField(&mapChipField_);
+	previousTime_ = std::chrono::steady_clock::now();
+	snowPhysicsAccumulator_ = 0.0f;
+
 
 	bossModel_ = Model::CreateFromOBJ("Boss");
 	boss_ = new Boss();
@@ -40,8 +47,19 @@ void GameScene::Initialize() {
 }
 
 void GameScene::Update() {
+	const auto now = std::chrono::steady_clock::now();
+	const float elapsed = +std::chrono::duration<float>(now - previousTime_).count();
+	previousTime_ = now;
 	player_->Update();
+
+	snowPhysicsAccumulator_ += +std::clamp(elapsed, 0.0f, 0.05f);
+	while (snowPhysicsAccumulator_ >= kSnowPhysicsStep) {
+		player_->UpdateSnowPhysics(kSnowPhysicsStep, mapChipField_);
+		snowPhysicsAccumulator_ -= kSnowPhysicsStep;
+	}
+
 	boss_->Update();
+
 }
 
 
@@ -54,7 +72,7 @@ void GameScene::Draw() {
 				continue;
 			}
 			if (mapChipField_.GetMapChipTypeByIndex(
-					static_cast<uint32_t>(column), static_cast<uint32_t>(row)) == MapChipType::kBlock) {
+				static_cast<uint32_t>(column), static_cast<uint32_t>(row)) == MapChipType::kBlock) {
 				modelBlock_->Draw(*block, camera_);
 			}
 		}
@@ -77,11 +95,6 @@ void GameScene::GenerateBlocks() {
 		line.resize(columns);
 	}
 
-	// MapChipField の位置は XY。CSV の実寸を使って中心を求め、XZ の床へ写す。
-	const float centerX = (columns - 1) * MapChipField::kBlockWindth * 0.5f;
-	const float centerY =
-		mapChipField_.GetMapChipPositionByIndex(0, 0).y -
-		(rows - 1) * MapChipField::kBlockHeight * 0.5f;
 	for (uint32_t row = 0; row < rows; ++row) {
 		for (uint32_t column = 0; column < columns; ++column) {
 			if (mapChipField_.GetMapChipTypeByIndex(column, row) != MapChipType::kBlock) {
@@ -92,10 +105,11 @@ void GameScene::GenerateBlocks() {
 			block->Initialize();
 			// bloc.obj は -1～+1 の立方体。床一マスの幅と奥行きに合わせる。
 			block->scale_ = {
-				MapChipField::kBlockWindth * 0.5f, 0.05f,
-				MapChipField::kBlockHeight * 0.5f};
-			const Vector3 chipPosition = mapChipField_.GetMapChipPositionByIndex(column, row);
-			block->translation_ = {chipPosition.x - centerX, -0.05f, chipPosition.y - centerY};
+				MapChipField::kBlockWindth * 0.5f, MapChipField::kTopDownBlockThickness * 0.5f,
+				MapChipField::kBlockHeight * 0.5f
+			};
+			block->translation_ = mapChipField_.GetTopDownPositionByIndex(column, row);
+			block->translation_.y = MapChipField::kTopDownFloorTop - MapChipField::kTopDownBlockThickness * 0.5f;
 			block->matWorld_ = MakeAffineMatrix(block->scale_, block->rotation_, block->translation_);
 			block->TransferMatrix();
 			worldTransformBlocks_[row][column] = std::move(block);

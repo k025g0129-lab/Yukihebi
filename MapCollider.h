@@ -84,6 +84,8 @@ public:
 	};
 
 	void SetMapChipField(MapChipField* field) { mapChipField_ = field; }
+	// XZ に並べた床ブロックを三次元の箱として判定する。
+	void SetTopDownMode(bool enabled) { topDownMode_ = enabled; }
 
 	void SetSize(float width, float height) {
 		width_ = width;
@@ -106,7 +108,9 @@ public:
 	static Vector3 ResolveVelocity(const Vector3& velocity, const Contact& contact);
 
 private:
+	Result CheckTopDown(const Vector3& center, const Vector3& movement, const MoveOptions& options);
 	MapChipField* mapChipField_ = nullptr;
+	bool topDownMode_ = false;
 	float width_ = 0.8f;
 	float height_ = 0.8f;
 	Settings settings_{};

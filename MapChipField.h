@@ -19,6 +19,8 @@ public:
 	// ブロックの幅と高さは、ワールド座標での単位。1.0f が 1 マス。
 	static constexpr float kBlockWindth = 1.0f;
 	static constexpr float kBlockHeight = 1.0f;
+	static constexpr float kTopDownBlockThickness = 0.1f;
+	static constexpr float kTopDownFloorTop = 0.0f;
 
 	//blocの個数
 	static constexpr uint32_t kNumBlockVirtical = 500;
@@ -39,6 +41,8 @@ public:
 	static bool IsSlippery(MapChipType type);
 
 	Vector3 GetMapChipPositionByIndex(uint32_t xIndex, uint32_t yIndex);
+	// CSV の行・列を、原点中心の見下ろし用 XZ 座標へ変換する。
+	Vector3 GetTopDownPositionByIndex(uint32_t xIndex, uint32_t yIndex) const;
 
 	uint32_t GetNumBlockVirtical() { return kNumBlockVirtical; }
 	uint32_t GetNumBlockHorizontal() { return kNumBlockHorizontal; }
