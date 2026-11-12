@@ -1,7 +1,8 @@
-﻿#include "GameScene.h"
+#include "GameScene.h"
 
 #include "GameMath.h"
 #include "Player.h"
+#include "Boss.h"
 
 GameScene::GameScene() {
 }
@@ -9,6 +10,8 @@ GameScene::GameScene() {
 GameScene::~GameScene() {
 	delete player_;
 	delete playerModel_;
+	delete bossModel_;
+	delete boss_ ;
 }
 
 
@@ -19,18 +22,26 @@ void GameScene::Initialize() {
 	camera_.rotation_ = {1.16f, 0.0f, 0.0f};
 	camera_.UpdateMatrix();
 	camera_.TransferMatrix();
+	
 
 	// CSV のマップチップからブロックを生成する。
 	mapChipField_.LoadMapChipCSV("Resources/floor.csv");
 	modelBlock_.reset(Model::CreateFromOBJ("bloc"));
 	GenerateBlocks();
+
 	playerModel_ = Model::CreateFromOBJ("Player");
 	player_ = new Player();
 	player_->Initialize(playerModel_, &camera_);
+
+	bossModel_ = Model::CreateFromOBJ("Boss");
+	boss_ = new Boss();
+	boss_->Initialize(bossModel_, &camera_,player_);
+
 }
 
 void GameScene::Update() {
 	player_->Update();
+	boss_->Update();
 }
 
 
@@ -49,6 +60,8 @@ void GameScene::Draw() {
 		}
 	}
 	player_->Draw();
+	boss_->Draw();
+
 	Model::PostDraw();
 }
 

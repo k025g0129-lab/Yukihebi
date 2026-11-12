@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <KamataEngine.h>
 #include <memory>
 #include <vector>
@@ -7,6 +7,7 @@
 using namespace KamataEngine;
 
 class Player;
+class Boss;
 
 class GameScene {
 public:
@@ -26,4 +27,7 @@ private:
 	std::unique_ptr<Model> modelBlock_;
 	Model* playerModel_ = nullptr;
 	Player* player_ = nullptr;
+
+	Model* bossModel_ = nullptr;
+	Boss* boss_ = nullptr;
 };

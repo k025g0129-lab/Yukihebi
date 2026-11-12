@@ -14,6 +14,8 @@ public:
 	void Draw();
 	void SetMoveSpeed(float speed) { moveSpeed_ = speed; }
 
+	Vector3 GetVector3() { return worldTransform_.translation_; };
+
 private:
 	const Camera* camera_ = nullptr;
 	WorldTransform worldTransform_{};

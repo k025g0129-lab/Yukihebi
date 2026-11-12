@@ -1,4 +1,4 @@
-﻿#include "GameMath.h"
+#include "GameMath.h"
 
 #include <algorithm>
 #include <cmath>
