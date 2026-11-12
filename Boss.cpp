@@ -6,6 +6,10 @@ Boss::Boss() = default;
 Boss::~Boss() = default;
 
 void Boss::Initialize(Model* model, const Camera* camera, Player* player) {
+
+	behavior = Behavior::kUnknown;
+	behaviorRequest = Behavior::kUnknown;
+
 	camera_ = camera;
 	model_ = model;
 	worldTransform_.Initialize();
@@ -23,8 +27,8 @@ void Boss::Initialize(Model* model, const Camera* camera, Player* player) {
 
 void Boss::Update() {
 
-	FaceTowardPlayer();
-	TrackingWalk();
+	//TrackingWalkUpdate();
+	RushUpdate();
 
 	worldTransform_.matWorld_ = MakeAffineMatrix(worldTransform_.scale_, worldTransform_.rotation_, worldTransform_.translation_);
 	worldTransform_.TransferMatrix();
@@ -35,6 +39,9 @@ void Boss::Draw() {
 }
 
 void Boss::FaceTowardPlayer() { 
+
+	//顔をプレイヤーの方向に徐々に向けさせる
+
 	Vector3 playerPos = player_->GetVector3();
 	float turnAngle = 0.0f;
 
@@ -55,10 +62,42 @@ void Boss::FaceTowardPlayer() {
 
 }
 
-void Boss::TrackingWalk() {
+void Boss::TrackingWalkUpdate() {
 
+	//顔の向きを徐々にプレイヤーに向ける
+	FaceTowardPlayer();
+	
+	//その方向に移動
 	worldTransform_.translation_.x += std::sinf(worldTransform_.rotation_.y) * kMaxWalkSpeed;
 	worldTransform_.translation_.z += std::cosf(worldTransform_.rotation_.y) * kMaxWalkSpeed;
 
 
+}
+
+void Boss::RushUpdate() {
+	rushT += 1.0f / 60.0f;
+
+	switch (rushAttack) {
+	case FaceTowardCharge:
+		FaceTowardPlayer();
+
+		if (rushT > kMaxFaceTowardChargeTime) {
+			rushAttack = RushAttack::NotTowardCharge;
+		}
+
+		break;
+	case NotTowardCharge:
+		if (rushT >kMaxRushChargeTime) {
+			rushAttack = RushAttack::Rush;
+		}
+		break;
+	case Rush:
+		// その方向に移動
+		worldTransform_.translation_.x += std::sinf(worldTransform_.rotation_.y) * kMaxWalkSpeed;
+		worldTransform_.translation_.z += std::cosf(worldTransform_.rotation_.y) * kMaxWalkSpeed;
+
+		break;
+
+	}
+	
 }
