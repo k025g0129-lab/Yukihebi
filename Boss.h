@@ -10,6 +10,24 @@ class Player;
 
 using namespace KamataEngine;
 
+
+enum class Behavior {
+	kTrackingWalk,
+	kDeath,
+	kDamageReaction,
+	kRush,
+	k,
+	kUnknown,
+};
+
+enum RushAttack {
+	FaceTowardCharge,
+	NotTowardCharge,
+	Rush,
+};
+
+
+
 class Boss {
 public:
 	Boss();
@@ -20,10 +38,19 @@ public:
 	void Draw();
 
 	void FaceTowardPlayer(); 
-	void TrackingWalk();
+	void TrackingWalkUpdate();
+	void DushMove();
+
+	void RushUpdate();
+
+	const WorldTransform& GetWorldTransform() { return worldTransform_; };
 
 
 private:
+
+	//状態
+	Behavior behavior;
+	Behavior behaviorRequest;
 
 	//基本変数設定
 	const Camera* camera_ = nullptr;
@@ -33,10 +60,14 @@ private:
 
 	Player* player_;
 
-	//旋回
+	//追従
 	static inline const float kMaxWalkSpeed = 0.03f;
-	static inline const float kMaxTurnAngle = 0.1f;
+	static inline const float kMaxTurnAngle = 0.05f;
 
-
+	//突進
+	static inline const float kMaxFaceTowardChargeTime = 5.0f;
+	static inline const float kMaxRushChargeTime = 1.0f;
+	RushAttack rushAttack;
+	float rushT = 0.0f;
 
 };
