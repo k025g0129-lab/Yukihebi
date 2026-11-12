@@ -53,18 +53,22 @@ void GameScene::Draw() {
 }
 
 void GameScene::GenerateBlocks() {
-	const uint32_t rows = mapChipField_.GetNumBlockVirtical();
-	const uint32_t columns = mapChipField_.GetNumBlockHorizontal();
+	const uint32_t rows = mapChipField_.GetLoadedBlockVirtical();
+	const uint32_t columns = mapChipField_.GetLoadedBlockHorizontal();
 	worldTransformBlocks_.clear();
+	if (rows == 0 || columns == 0) {
+		return;
+	}
 	worldTransformBlocks_.resize(rows);
 	for (auto& line : worldTransformBlocks_) {
 		line.resize(columns);
 	}
 
-	// MapChipField の位置は XY。見下ろし用に XZ へ写し、9×9 のマップを原点中心に置く。
-	const float centerX = (kFloorSide - 1) * MapChipField::kBlockWindth * 0.5f;
+	// MapChipField の位置は XY。CSV の実寸を使って中心を求め、XZ の床へ写す。
+	const float centerX = (columns - 1) * MapChipField::kBlockWindth * 0.5f;
 	const float centerY =
-		(rows - 1 - (kFloorSide - 1) * 0.5f) * MapChipField::kBlockHeight;
+		mapChipField_.GetMapChipPositionByIndex(0, 0).y -
+		(rows - 1) * MapChipField::kBlockHeight * 0.5f;
 	for (uint32_t row = 0; row < rows; ++row) {
 		for (uint32_t column = 0; column < columns; ++column) {
 			if (mapChipField_.GetMapChipTypeByIndex(column, row) != MapChipType::kBlock) {
