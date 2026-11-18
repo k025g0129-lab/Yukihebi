@@ -60,10 +60,9 @@ void Snow::Draw(Model* model, const Camera* camera) {
 //===========================
 void Snow::UpdateHeld(const Vector3& playerPosition, float playerYaw, float movedDistance, float playerHalfWidth,
                       float floorY) {
+	// 移動距離に応じた成長量を加算する。最大半径を超えないように制限する。
 	// 移動距離に応じて雪玉の半径を成長させる。最大半径を超えないように制限する。
 	radius_ = (std::min)(radius_ + movedDistance * growthPerDistance_, maxRadius_);
-	// 移動距離に応じた成長量を加算する。最大半径を超えないように制限する。
-
 	// Playerの表示上の正面方向（+Zを正面とする）
 	const Vector3 forward = {std::sin(playerYaw), 0.0f, std::cos(playerYaw)}; // プレイヤーの正面方向の単位ベクトルを計算する。
 
@@ -166,9 +165,11 @@ void Snow::SnowToSnowCollision(Snow& other) {
 	PrepareDraw();
 }
 
-void Snow::Release() {
+void Snow::Release(const Vector3& PlayerVelocity, const Vector3& PlayerRotation) {
 	if (state_ == State::kPushed) {
 		state_ = State::kFree;
+		velocity_ = PlayerVelocity * 1.5f;
+		rotation_ = PlayerRotation;
 	}
 }
 
@@ -236,6 +237,7 @@ void Snow::UpdatePhysics(float deltaTime, MapChipField& map, const Vector3& play
 			velocity_.x *= ratio;
 			velocity_.z *= ratio;
 			angularVelocity_ *= ratio;
+			radius_ = (std::min)(radius_ + speed * 0.005f * growthPerDistance_, maxRadius_);
 		}
 
 		rotation_ += angularVelocity_ * stepTime;
