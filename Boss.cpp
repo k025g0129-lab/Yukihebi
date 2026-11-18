@@ -22,7 +22,7 @@ void Boss::Initialize(Model* model, const Camera* camera, Player* player) {
 
 	player_ = player;
 	
-	bossTails_.clear();
+	bossTails_
 
 }
 
