@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include "Boss.h"
+#include  "CameraController.h"
 #include "GameMath.h"
 #include "Player.h"
 
@@ -17,14 +18,6 @@ GameScene::~GameScene() {
 
 
 void GameScene::Initialize() {
-	// XZ 平面を見下ろす固定カメラ。画面の上が +Z 方向になる。
-	camera_.Initialize();
-	camera_.translation_ = {0.0f, 16.0f, -7.0f};
-	camera_.rotation_ = {1.16f, 0.0f, 0.0f};
-	camera_.UpdateMatrix();
-	camera_.TransferMatrix();
-
-
 	// CSV のマップチップからブロックを生成する。
 	mapChipField_.LoadMapChipCSV("Resources/floor.csv");
 	modelBlock_.reset(Model::CreateFromOBJ("cube"));
@@ -43,6 +36,38 @@ void GameScene::Initialize() {
 	bossModel_ = Model::CreateFromOBJ("Boss");
 	boss_ = new Boss();
 	boss_->Initialize(bossModel_, &camera_, player_);
+
+	cameraController_ = new CameraController();
+	cameraController_->SetCamera(&camera_);
+	// 初期化
+	cameraController_->Initialize();
+	// マップの端は最外周のマスの中心から半マス外側にある。
+	// CameraController::Initialize() が入れている固定値のままだと、
+	// マップの外へカメラが寄ってPlayerが画面から外れる。
+	CameraController::Rect movableArea;
+	movableArea.left = -MapChipField::kBlockWindth * 0.5f;
+	movableArea.right = (18.0f - 0.5f) * MapChipField::kBlockWindth;
+	movableArea.bottom = -MapChipField::kBlockHeight * 0.5f;
+	movableArea.top = (18.0 - 0.5f) * MapChipField::kBlockHeight;
+	cameraController_->SetMovableArea(movableArea);
+
+	cameraController_->SetTarget(player_);
+
+	// セット
+	// cameraController_->SetTarget(player_);
+
+	// カメラのリセット
+	cameraController_->Reset();
+	// const Vector3 gameplayCameraTranslation = camera_.translation_;
+	//// Title 中だけ title.csv の全体を収める。Play では CameraController::Reset で戻す。
+	// const float halfFovTangent = std::tan(camera_.fovAngleY * 0.5f);
+	camera_.UpdateMatrix();
+	// XZ 平面を見下ろす固定カメラ。画面の上が +Z 方向になる。
+	camera_.Initialize();
+	camera_.translation_ = {0.0f, 16.0f, -7.0f};
+	camera_.rotation_ = {1.16f, 0.0f, 0.0f};
+	camera_.UpdateMatrix();
+	camera_.TransferMatrix();
 }
 
 void GameScene::Update() {

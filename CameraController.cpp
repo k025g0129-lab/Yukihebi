@@ -1,95 +1,152 @@
-﻿#include "CameraController.h"
-#include "Stage.h"
+#include "CameraController.h"
 
 #include <algorithm>
 #include <cmath>
 
-void CameraController::Initialize(const GameSettings& settings, const Stage& stage, int ballLayer,
-	                              const Vector3& ballPosition) {
-	settings_ = settings;
-	// Rで再開始するときは、CameraのGPUリソースを作り直さず設定と注視点を戻す。
-	if (!initialized_) {
-		camera_.Initialize();
-		initialized_ = true;
-	}
-	displayLayer_ = ballLayer;
-	previousBallLayer_ = ballLayer;
-	// 前のプレイで残った揺れ・ずれを持ち越さない。
-	kick_ = {};
-	shake_ = 0.0f;
-	// 開始地点が端にある大きいマップでも、初回から球を画面に入れる。
-	target_ = CalculateTarget(stage, ballPosition);
-	Update(0.0f, stage, ballPosition);
-}
 
-void CameraController::SwitchLayer(int layerCount) {
-	// 内部階層は0始まり。最後の階層の次は剰余で0へ戻す。
-	if (layerCount > 0) { displayLayer_ = (displayLayer_ + 1) % layerCount; }
-}
+#include "GameMath.h"
+#include "Player.h"
 
-void CameraController::FollowBallLayer(int ballLayer) {
-	// ボールが実際に別階層へ移った瞬間だけ追従する。
-	// 毎フレーム上書きすると、Spaceで別階層を確認できなくなる。
-	if (ballLayer != previousBallLayer_) { displayLayer_ = ballLayer; }
-	previousBallLayer_ = ballLayer;
-}
-
-void CameraController::AddKick(const Vector3& direction, float distance) {
-	kick_ += Normalize(direction) * distance;
-}
-
-void CameraController::AddShake(float strength) {
-	// 弱い当たりが続いても、強い揺れの途中で弱めない。
-	shake_ = (std::max)(shake_, std::clamp(strength, 0.0f, 1.0f));
-}
-
-void CameraController::ClearImpact() {
-	kick_ = {};
-	shake_ = 0.0f;
-}
-
-Vector3 CameraController::CalculateTarget(const Stage& stage, const Vector3& ballPosition) const {
-	const auto& map = stage.GetMap();
-	const float halfWidth = static_cast<float>(map.GetNumBlockHorizontal()) * settings_.cellSize * 0.5f;
-	const float halfDepth = static_cast<float>(map.GetNumBlockDepth()) * settings_.cellSize * 0.5f;
-	const float framedHalfSize = settings_.cameraMaximumFramingCells * settings_.cellSize * 0.5f;
-	const float maxOffsetX = (std::max)(0.0f, halfWidth - framedHalfSize);
-	const float maxOffsetZ = (std::max)(0.0f, halfDepth - framedHalfSize);
-	const Vector3 ballLocal = stage.WorldToLocal(ballPosition);
-	return stage.LocalToWorld({
-		std::clamp(ballLocal.x, -maxOffsetX, maxOffsetX),
-		map.GetFloorHeight(displayLayer_) + settings_.cellSize * 0.5f,
-		std::clamp(ballLocal.z, -maxOffsetZ, maxOffsetZ)
-	});
-}
-
-void CameraController::Update(float deltaTime, const Stage& stage, const Vector3& ballPosition) {
-	const auto& map = stage.GetMap();
-	const Vector3 target = CalculateTarget(stage, ballPosition);
-	// 指数補間の係数1-exp(-速さ×秒)を使い、描画FPSが違っても追従の速さをそろえやすくする。
-	target_ = Lerp(target_, target, 1.0f - std::exp(-settings_.cameraFollowSpeed * deltaTime));
-	// 広いマップは表示範囲を設定マス数で制限し、球が小さくなりすぎるのを防ぐ。
-	const float framedHalfSize = settings_.cameraMaximumFramingCells * settings_.cellSize * 0.5f;
-	const float halfWidth = (std::min)(static_cast<float>(map.GetNumBlockHorizontal()) * settings_.cellSize * 0.5f,
-	                                   framedHalfSize);
-	const float halfDepth = (std::min)(static_cast<float>(map.GetNumBlockDepth()) * settings_.cellSize * 0.5f,
-	                                   framedHalfSize);
-	// 透視投影の関係 tan(縦画角/2)=半高さ/距離を利用し、幅と奥行きを収める距離を計算する。
-	const float tangent = std::tan(camera_.fovAngleY * 0.5f);
-	const float widthDistance = halfWidth / (tangent * camera_.aspectRatio);
-	const float depthDistance = halfDepth / (tangent * std::sin(settings_.cameraPitch));
-	// 表示範囲の幅・奥行きから距離を選び、周辺が見える余白を足す。
-	const float distance = (std::max)(widthDistance, depthDistance) * settings_.cameraPadding + settings_.cellSize;
-	// キックは指数で戻し、揺れは一定量ずつ減らす。描画FPSが変わっても速さをそろえる。
-	kick_ = Lerp(kick_, {0.0f, 0.0f, 0.0f}, 1.0f - std::exp(-settings_.cameraKickReturnSpeed * deltaTime));
-	shake_ = (std::max)(0.0f, shake_ - settings_.cameraShakeDecay * deltaTime);
-	// 揺れは注視点ごと動かす。残り強さに比例した半径の球内へ、毎フレーム別のずれを足す。
-	const Vector3 shakeOffset = Random::InsideSphere(shake_ * settings_.cameraShakeRadius);
-	// 箱の回転には合わせず、カメラは一定の俯角で見る。90度なら真上、0度なら水平。
-	camera_.rotation_ = {settings_.cameraPitch, 0.0f, 0.0f};
-	camera_.translation_ = target_ + kick_ + shakeOffset + Vector3{
-		0.0f, std::sin(settings_.cameraPitch) * distance, -std::cos(settings_.cameraPitch) * distance
+// カメラの初期化
+void CameraController::Initialize() {
+	camera_->Initialize();
+	followPosition_ = camera_->translation_;
+	playerFocusY_ = followPosition_.y;
+	camera_->rotation_ = {1.3962634015955f, 0.0f, 0.0f};
+	movableArea_ = {
+		.left = -500.0f,
+		.top = 500.0f,
+		.right = 500.0f,
+		.bottom = -500.0f,
 	};
-	// translation_とrotation_を変えた後にカメラ行列を更新し、次の描画に反映する。
-	camera_.UpdateMatrix();
+}
+
+// カメラの更新
+void CameraController::Update() {
+	const Vector3 targetPosition = target_->GetWorldTransform().translation_;
+	const Vector3 playerPosition = target_->GetWorldTransform().translation_;
+	const Vector3 targetVelocity = target_->GetVelocity();
+
+	const bool followingPlayer = coreTarget_ == nullptr && bombTarget_ == nullptr &&
+		projectileTarget_ == nullptr;
+	const float velocityBias = followingPlayer ? kVelocityBias : 0.15f;
+	targetPosition_.x = playerPosition.x + targetOffset_.x + targetVelocity.x * velocityBias;
+	targetPosition_.y = playerPosition.y + targetOffset_.y;
+	targetPosition_.z = playerPosition.z + targetOffset_.z + targetVelocity.z * velocityBias;
+
+	targetPosition_.z = targetPosition.z + targetOffset_.z + targetVelocity.z * velocityBias;
+	followPosition_.x = std::lerp(followPosition_.x, targetPosition_.x, kInterpolationRate);
+	followPosition_.y = std::lerp(followPosition_.y, targetPosition_.y, kInterpolationRate);
+	followPosition_.z = std::lerp(followPosition_.z, targetPosition_.z, kInterpolationRate);
+
+	followPosition_.x = std::clamp(followPosition_.x, targetPosition_.x + margin.left,
+	                               targetPosition_.x + margin.right);
+	followPosition_.y = std::clamp(followPosition_.y, targetPosition_.y + margin.bottom,
+	                               targetPosition_.y + margin.top);
+
+	followPosition_ = ClampToMovableArea(followPosition_);
+
+	// 反動と揺れも含めた最終位置を制限し、画面端がマップの外へ出ないようにする。
+	camera_->translation_ = ClampToMovableArea(followPosition_ + impactKickOffset_);
+	impactKickOffset_ *= impactKickRetention_;
+	if (LengthSquared(impactKickOffset_) < 0.0001f) {
+		impactKickOffset_ = {};
+	}
+
+	camera_->UpdateMatrix();
+}
+
+void CameraController::UpdateShakeOnly(const Vector3& basePosition) {
+	camera_->translation_ = basePosition + impactKickOffset_;
+	impactKickOffset_ *= impactKickRetention_;
+	if (LengthSquared(impactKickOffset_) < 0.0001f) {
+		impactKickOffset_ = {};
+	}
+	camera_->UpdateMatrix();
+}
+
+// カメラのリセット
+void CameraController::Reset() {
+	const WorldTransform& targetWorldTransform = target_->GetWorldTransform();
+
+	followPosition_.x = targetWorldTransform.translation_.x + targetOffset_.x;
+	playerFocusY_ = targetWorldTransform.translation_.y + targetOffset_.y;
+	followPosition_.y = playerFocusY_;
+	followPosition_.z = targetWorldTransform.translation_.z + targetOffset_.z;
+	followPosition_ = ClampToMovableArea(followPosition_);
+	camera_->translation_ = followPosition_;
+
+	shakeAmplitude_ = 0.0f;
+	shakeDurationFrames_ = 0.0f;
+	shakeRemainingFrames_ = 0.0f;
+	impactKickOffset_ = {};
+}
+
+Vector3 CameraController::ClampToMovableArea(const Vector3& position) const {
+	Vector3 clamped = position;
+	// マップは Z=0 の XY 平面にあり、カメラは回転しない。
+	const float viewDepth = std::abs(position.z);
+	const float halfHeight = viewDepth * std::tan(camera_->fovAngleY * 0.5f);
+	const float halfWidth = halfHeight * camera_->aspectRatio;
+
+	const float minX = movableArea_.left + halfWidth;
+	const float maxX = movableArea_.right - halfWidth;
+	const float minY = movableArea_.bottom + halfHeight;
+	const float maxY = movableArea_.top - halfHeight;
+
+	// 表示範囲がマップより大きい軸は中央に置く（外側の表示は避けられない）。
+	clamped.x = minX <= maxX
+		            ? std::clamp(position.x, minX, maxX)
+		            : (movableArea_.left + movableArea_.right) * 0.5f;
+	clamped.z = minY <= maxY
+		            ? std::clamp(position.z, minY, maxY)
+		            : (movableArea_.bottom + movableArea_.top) * 0.5f;
+	return clamped;
+}
+
+void CameraController::RequestShake(float amplitude, float durationFrames) {
+	if (amplitude <= 0.0f || durationFrames <= 0.0f) {
+		return;
+	}
+	const float currentAmplitude = shakeDurationFrames_ > 0.0f
+		                               ? shakeAmplitude_ * shakeRemainingFrames_ / shakeDurationFrames_
+		                               : 0.0f;
+	if (amplitude < currentAmplitude) {
+		return;
+	}
+	shakeAmplitude_ = amplitude;
+	shakeDurationFrames_ = durationFrames;
+	shakeRemainingFrames_ = durationFrames;
+}
+
+void CameraController::RequestImpactKick(
+	const Vector3& surfaceNormal, float amplitude, float retention) {
+	const Vector3 planarNormal{surfaceNormal.x, surfaceNormal.y, 0.0f};
+	if (LengthSquared(planarNormal) <= 0.0001f || amplitude <= 0.0f) {
+		return;
+	}
+	impactKickOffset_ = -Normalize(planarNormal) * amplitude;
+	impactKickRetention_ = std::clamp(retention, 0.0f, 0.99f);
+}
+
+void CameraController::SetMapImpactShakeSettings(const MapImpactShakeSettings& settings) {
+	mapImpactShakeSettings_ = settings;
+	mapImpactShakeSettings_.minImpactSpeed = (std::max)(0.0f, settings.minImpactSpeed);
+	mapImpactShakeSettings_.amplitudePerSpeed = (std::max)(0.0f, settings.amplitudePerSpeed);
+	mapImpactShakeSettings_.maxAmplitude = (std::max)(0.0f, settings.maxAmplitude);
+	mapImpactShakeSettings_.durationFrames = (std::max)(0.0f, settings.durationFrames);
+}
+
+void CameraController::SetPlayerVerticalFocusMargin(float verticalMargin) {
+	playerVerticalFocusMargin_ = (std::max)(0.0f, verticalMargin);
+}
+
+void CameraController::RequestMapImpactShake(float impactSpeed) {
+	if (impactSpeed <= mapImpactShakeSettings_.minImpactSpeed) {
+		return;
+	}
+	const float amplitude = std::clamp(
+		(impactSpeed - mapImpactShakeSettings_.minImpactSpeed) * mapImpactShakeSettings_.amplitudePerSpeed,
+		0.0f, mapImpactShakeSettings_.maxAmplitude);
+	RequestShake(amplitude, mapImpactShakeSettings_.durationFrames);
 }
