@@ -39,6 +39,9 @@ public:
 		float squashAmount = 0.35f;
 		float squashTime = 0.09f;
 		float squashImpulse = 0.4f;
+
+
+		float snowContactSpeed = 0.5f;
 	};
 
 	void SetSettings(const Settings& settings) { settings_ = settings; }
@@ -79,11 +82,17 @@ public:
 	//==========================
 	const WorldTransform& GetWorldTransform() const { return worldTransform_; } // ワールド変換行列を取得する
 
-	//==========================
-	// プレイヤーとの接触判定
-	//==========================
-	void PlayerToSnowCollsion(const Vector3& playerposition, float playerHalfWidth);
+	//=====================
+	// 接触判定
+	//=====================
+
+
+	/** プレイヤーと雪玉の接触判定 */
+	void PlayerToSnowCollision(const Vector3& playerposition, float playerHalfWidth);
 	// プレイヤーと雪玉の接触判定。プレイヤーが雪玉に接触した場合、雪玉を持つようにする
+
+	/** 雪玉と雪玉の接触判定 */
+	void SnowToSnowCollision(Snow& other);
 
 private:
 	//==========================

@@ -207,5 +207,13 @@ void Player::UpdateSnowPhysics(float deltaTime, MapChipField& map) {
 	for (Snow& snow : snows_) {
 		snow.UpdatePhysics(deltaTime, map, worldTransform_.translation_, worldTransform_.rotation_.y,
 		                   worldTransform_.scale_.x);
+
+		for (auto first = snows_.begin(); first != snows_.end(); ++first) {
+			auto second = first;
+			++second;
+			for (; second != snows_.end(); ++second) {
+				first->SnowToSnowCollision(*second);
+			}
+		}
 	}
 }

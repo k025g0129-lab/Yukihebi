@@ -82,7 +82,7 @@ void Snow::UpdateHeld(const Vector3& playerPosition, float playerYaw, float move
 	worldTransform_.TransferMatrix();
 }
 
-void Snow::PlayerToSnowCollsion(const Vector3& playerposition, float playerHalfWidth) {
+void Snow::PlayerToSnowCollision(const Vector3& playerposition, float playerHalfWidth) {
 	if (state_ == State::kPushed) {
 		return; // 持って転がしている雪玉には、この接触処理を重ねない
 	}
@@ -129,6 +129,43 @@ void Snow::PlayerToSnowCollsion(const Vector3& playerposition, float playerHalfW
 	state_ = State::kFree;
 }
 
+void Snow::SnowToSnowCollision(Snow& other) {
+	if (state_ == State::kPushed || other.state_ == State::kPushed) {
+		return;
+	}
+	const Vector3 difference = position_ - other.position_;
+	const float distanceSquared = LengthSquared(difference);
+	const float radiusSum = radius_ + other.radius_;
+	if (distanceSquared >= radiusSum * radiusSum) {
+		return;
+	}
+	Vector3 normal{};
+	float penetration = 0.0f;
+	if (distanceSquared > 0.00000001f) {
+		const float distance = std::sqrt(distanceSquared);
+		normal = difference / distance;
+		penetration = radiusSum - distance;
+	}
+	else {
+		// 球の中心が重なっている場合は、適当に押し出す。
+		normal = {1.0f, 0.0f, 0.0f};
+		penetration = radiusSum;
+	}
+
+	position_ += normal * (penetration + settings_.contactMargin);
+	other.position_ -= normal * (penetration + settings_.contactMargin);
+	const float outwardSpeed = Dot(velocity_, normal);
+	const float otherOutwardSpeed = Dot(other.velocity_, normal);
+	if (outwardSpeed < settings_.snowContactSpeed) {
+		velocity_ += normal * +(settings_.snowContactSpeed - outwardSpeed);
+	}
+	if (otherOutwardSpeed < settings_.snowContactSpeed) {
+		other.velocity_ -= normal * +(settings_.snowContactSpeed - otherOutwardSpeed);
+	}
+
+	PrepareDraw();
+}
+
 void Snow::Release() {
 	if (state_ == State::kPushed) {
 		state_ = State::kFree;
@@ -140,7 +177,8 @@ void Snow::UpdatePhysics(float deltaTime, MapChipField& map, const Vector3& play
 	if (deltaTime <= 0.0f) {
 		return;
 	}
-	PlayerToSnowCollsion(playerPosition, playerHalfWidth);
+	PlayerToSnowCollision(playerPosition, playerHalfWidth);
+
 	if (state_ == State::kStopped) {
 		return;
 	}
