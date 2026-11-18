@@ -8,6 +8,7 @@ using namespace KamataEngine;
 
 class Player;
 class Boss;
+class CameraController;
 
 class GameScene {
 public:
@@ -20,7 +21,7 @@ public:
 private:
 	void GenerateBlocks();
 
-	Camera camera_{};
+
 	MapChipField mapChipField_{};
 	std::vector<std::vector<std::unique_ptr<WorldTransform>>> worldTransformBlocks_;
 	std::unique_ptr<Model> modelBlock_;
@@ -32,8 +33,8 @@ private:
 	float snowPhysicsAccumulator_ = 0.0f;
 	static constexpr float kSnowPhysicsStep = 1.0f / 120.0f;
 
-
+	CameraController* cameraController_;
 	Model* bossModel_ = nullptr;
 	Boss* boss_ = nullptr;
-
+	Camera camera_;
 };

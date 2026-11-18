@@ -84,7 +84,7 @@ void Player::Update() {
 	// ==========================
 	// 移動処理
 	// ==========================
-	Vector3 movement{}; // XZ平面の移動量を計算する。Y方向の移動量は、重力処理で加算する。
+
 
 	// 方向ベクトルがゼロでない場合のみ、正規化して移動量を計算する。
 	if (lengthSquared > 0.0f) {
@@ -95,10 +95,8 @@ void Player::Update() {
 		facing_.x = direction.x * inverseLength; // XZ平面の向きベクトル
 		facing_.y = 0.0f; // Y成分は常に0
 		facing_.z = direction.z * inverseLength; // XZ平面の向きベクトル
+		velocity_ = {facing_.x * moveSpeed_, 0.0f, facing_.z * moveSpeed_};
 
-		// 移動量を計算する
-		movement.x = facing_.x * moveSpeed_; // XZ平面の移動量
-		movement.z = facing_.z * moveSpeed_; // XZ平面の移動量
 
 		// プレイヤーの向きを、facing_ の方向に回転させる。
 		const float targetYaw = std::atan2(facing_.x, facing_.z); // facing_ の方向の角度を求める
@@ -112,6 +110,9 @@ void Player::Update() {
 		constexpr float turnSpeed = ToRadian(6.0f); // 1フレームに最大6度
 		worldTransform_.rotation_.y += std::clamp(difference, -turnSpeed, turnSpeed); // 回転量を制限する
 	}
+	else {
+		velocity_ = {};
+	}
 
 	// ==========================
 	// 重力処理
@@ -120,10 +121,10 @@ void Player::Update() {
 	// Y方向の速度を更新する。重力加速度を加算する。最大落下速度を超えないように制限する。
 
 	// y方向の移動量を加算する
-	movement.y = verticalSpeed_; // Y方向の移動量を加算する。重力処理で計算したY方向の速度を加算する。
+	velocity_.y = verticalSpeed_; // Y方向の移動量を加算する。重力処理で計算したY方向の速度を加算する。
 
 	// 床ブロックの上面・側面・下面との接触を MapCollider に解決させる。
-	const MapCollider::Result collision = mapCollider_.Check(worldTransform_.translation_, movement);
+	const MapCollider::Result collision = mapCollider_.Check(worldTransform_.translation_, velocity_);
 	// 接触判定を行う。接触判定の結果、移動量が修正される。
 	worldTransform_.translation_ += collision.movement; // 接触判定後の移動量を加算する
 	// 接触判定の結果、床に接している場合は、y方向の速度を0にする。
