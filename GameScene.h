@@ -20,7 +20,7 @@ public:
 
 private:
 	void GenerateBlocks();
-
+	std::unique_ptr<LightGroup> playerLightGroup_;
 
 	MapChipField mapChipField_{};
 	std::vector<std::vector<std::unique_ptr<WorldTransform>>> worldTransformBlocks_;
@@ -37,4 +37,8 @@ private:
 	Model* bossModel_ = nullptr;
 	Boss* boss_ = nullptr;
 	Camera camera_;
+	void InitializePlayerLighting();
+	/// <summary>ステージ全体を1方向から照らす平行光源を設定する。</summary>
+	void InitializeDirectionalLight();
+	void UpdateLighting();
 };
