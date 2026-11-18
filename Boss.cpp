@@ -22,6 +22,7 @@ void Boss::Initialize(Model* model, const Camera* camera, Player* player) {
 
 	player_ = player;
 	
+	bossTails_.clear();
 
 }
 
@@ -83,12 +84,14 @@ void Boss::RushUpdate() {
 
 		if (rushT > kMaxFaceTowardChargeTime) {
 			rushAttack = RushAttack::NotTowardCharge;
+			rushT = 0.0f;
 		}
 
 		break;
 	case NotTowardCharge:
 		if (rushT >kMaxRushChargeTime) {
 			rushAttack = RushAttack::Rush;
+			rushT = 0.0f;
 		}
 		break;
 	case Rush:
@@ -96,6 +99,10 @@ void Boss::RushUpdate() {
 		worldTransform_.translation_.x += std::sinf(worldTransform_.rotation_.y) * kMaxWalkSpeed;
 		worldTransform_.translation_.z += std::cosf(worldTransform_.rotation_.y) * kMaxWalkSpeed;
 
+		if (rushT > kMaxRushTime) {
+			rushAttack = RushAttack::FaceTowardCharge;
+			rushT = 0.0f;
+		}
 		break;
 
 	}

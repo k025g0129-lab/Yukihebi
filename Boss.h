@@ -5,6 +5,8 @@
 #include <algorithm>
 
 #include <cmath>
+#include "BossTail.h"
+
 
 class Player;
 
@@ -67,7 +69,13 @@ private:
 	//突進
 	static inline const float kMaxFaceTowardChargeTime = 5.0f;
 	static inline const float kMaxRushChargeTime = 1.0f;
+	static inline const float kMaxRushTime = 3.0f;
 	RushAttack rushAttack;
 	float rushT = 0.0f;
+
+
+	//尻尾
+	std::list <BossTail> bossTails_;
+	BossTail* bossTail_;
 
 };

@@ -30,4 +30,7 @@ private:
 
 	Model* bossModel_ = nullptr;
 	Boss* boss_ = nullptr;
+	Model* bossTailModel_ = nullptr;
+
+
 };

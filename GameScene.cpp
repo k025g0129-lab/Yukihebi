@@ -11,6 +11,7 @@ GameScene::~GameScene() {
 	delete player_;
 	delete playerModel_;
 	delete bossModel_;
+	delete bossTailModel_;
 	delete boss_ ;
 }
 
@@ -34,6 +35,7 @@ void GameScene::Initialize() {
 	player_->Initialize(playerModel_, &camera_);
 
 	bossModel_ = Model::CreateFromOBJ("Boss");
+	bossTailModel_ = Model::CreateFromOBJ("BossTail");
 	boss_ = new Boss();
 	boss_->Initialize(bossModel_, &camera_,player_);
 
