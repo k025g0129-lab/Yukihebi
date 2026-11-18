@@ -148,6 +148,9 @@ void Player::Update() {
 		snow_->Initialize(worldTransform_.translation_);
 		snow_->UpdateHeld(worldTransform_.translation_, worldTransform_.rotation_.y, 0.0f, worldTransform_.scale_.x,
 		                  MapChipField::kTopDownFloorTop);
+		if (snows_.size() >= static_cast<size_t>(20)) {
+			snows_.pop_front(); // snows_ の要素が20個を超えた場合は、最初の要素を削除する。
+		}
 	}
 
 	// 雪玉を持っている場合は、雪玉の位置を更新する。プレイヤーの正面方向に置く。

@@ -34,9 +34,7 @@ public:
 	// 目標プレイヤー
 	Player* target_ = nullptr;
 	void SetTarget(Player* target) { target_ = target; }
-	void SetProjectileTarget(Enemy* target) { projectileTarget_ = target; }
-	void SetBombTarget(Bomb* target) { bombTarget_ = target; }
-	void SetCoreTarget(Core* target) { coreTarget_ = target; }
+
 
 	void Reset();
 
@@ -73,6 +71,7 @@ public:
 		.right = 10.0f,
 		.bottom = -10.0f,
 	};
+	const Camera* GetCamera() const { return camera_; }
 
 private:
 	// マップの四辺から、画面全体が収まるカメラ中心の範囲を求める。
@@ -90,7 +89,4 @@ private:
 	MapImpactShakeSettings mapImpactShakeSettings_{};
 	// カメラ
 	Camera* camera_ = nullptr;
-	Enemy* projectileTarget_ = nullptr;
-	Bomb* bombTarget_ = nullptr;
-	Core* coreTarget_ = nullptr;
 };

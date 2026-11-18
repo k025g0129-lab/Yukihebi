@@ -27,9 +27,7 @@ void CameraController::Update() {
 	const Vector3 playerPosition = target_->GetWorldTransform().translation_;
 	const Vector3 targetVelocity = target_->GetVelocity();
 
-	const bool followingPlayer = coreTarget_ == nullptr && bombTarget_ == nullptr &&
-		projectileTarget_ == nullptr;
-	const float velocityBias = followingPlayer ? kVelocityBias : 0.15f;
+	constexpr float velocityBias = kVelocityBias * 0.15f;
 	targetPosition_.x = playerPosition.x + targetOffset_.x + targetVelocity.x * velocityBias;
 	targetPosition_.y = playerPosition.y + targetOffset_.y;
 	targetPosition_.z = playerPosition.z + targetOffset_.z + targetVelocity.z * velocityBias;
