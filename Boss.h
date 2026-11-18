@@ -77,5 +77,7 @@ private:
 	//尻尾
 	std::list <BossTail> bossTails_;
 	BossTail* bossTail_;
+	static inline const int kInitializeMaxTail = 5;
+
 
 };
