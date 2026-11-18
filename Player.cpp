@@ -78,6 +78,7 @@ void Player::Update() {
 		direction.z -= 1.0f; // XZ平面の移動方向を決定する。後ろに移動する場合は、Z軸方向に-1.0fを加算する。
 	}
 
+
 	// 斜め移動だけ速くならないよう、入力方向を正規化する。
 	const float lengthSquared = direction.x * direction.x + direction.z * direction.z; // XZ平面の長さの二乗を計算する。
 
@@ -175,7 +176,8 @@ void Player::Update() {
 		// 雪玉を置く
 		//=========================
 		if (!holding) {
-			snow_->Release();
+			snow_->Release(velocity_, worldTransform_.rotation_);
+
 			snow_ = nullptr; // 置く。snows_の要素は消さない
 		}
 	}
