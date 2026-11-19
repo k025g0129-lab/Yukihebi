@@ -42,8 +42,7 @@ void GameScene::Initialize() {
 	bossModel_ = Model::CreateFromOBJ("Boss");
 	bossTailModel_ = Model::CreateFromOBJ("BossTail");
 	boss_ = new Boss();
-	boss_->Initialize(bossModel_, &camera_, player_);
-
+	boss_->Initialize(bossModel_, bossTailModel_, & camera_, player_);
 	cameraController_ = new CameraController();
 	cameraController_->SetCamera(&camera_);
 	cameraController_->Initialize();
@@ -59,7 +58,7 @@ void GameScene::Initialize() {
 
 	cameraController_->Reset();
 	UpdateLighting();
-	boss_->Initialize(bossModel_, bossTailModel_, & camera_, player_);
+
 }
 
 void GameScene::Update() {
