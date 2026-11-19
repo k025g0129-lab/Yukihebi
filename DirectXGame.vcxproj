@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
@@ -179,6 +179,7 @@ xcopy "$(ProjectDir)..\External\KamataEngine\shaders" "$(ProjectDir)Resources\En
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Boss.cpp" />
+    <ClCompile Include="BossTail.cpp" />
 
     <ClCompile Include="ClearScene.cpp" />
     <ClCompile Include="Fade.cpp" />
@@ -198,6 +199,7 @@ xcopy "$(ProjectDir)..\External\KamataEngine\shaders" "$(ProjectDir)Resources\En
     <ClCompile Include="TutorialScene.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="BossTail.h" />
     <ClInclude Include="ClearScene.h" />
     <ClInclude Include="Fade.h" />
     <ClInclude Include="CameraController.h" />

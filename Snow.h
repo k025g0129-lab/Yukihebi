@@ -5,6 +5,7 @@
 
 using namespace KamataEngine;
 class MapChipField;
+class Boss;
 
 class Snow {
 public:
@@ -94,6 +95,9 @@ public:
 	const WorldTransform& GetWorldTransform() const { return worldTransform_; } // ワールド変換行列を取得する
 	float GetMass() const; // 半径に応じた質量
 
+	const Vector3& GetPos() const { return position_; };
+	const float& GetRadius() const { return radius_; };
+	bool IsSizeMax() const;
 	//=====================
 	// 接触判定
 	//=====================
@@ -106,6 +110,8 @@ public:
 	/** 雪玉と雪玉の接触判定 */
 	void SnowToSnowCollision(Snow& other);
 
+	void BossMouthToSnowIsCollision();
+	
 private:
 	//==========================
 	// メンバ変数

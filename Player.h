@@ -46,6 +46,7 @@ public:
 	Vector3 GetVector3() { return worldTransform_.translation_; };
 	const WorldTransform& GetWorldTransform() const { return worldTransform_; }
 	const Vector3& GetVelocity() const { return velocity_; }
+	std::list<Snow>& GetSnows() { return snows_; };
 
 private:
 	//==========================

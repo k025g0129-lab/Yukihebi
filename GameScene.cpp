@@ -139,9 +139,9 @@ void GameScene::Initialize() {
 	effects_->Initialize();
 
 	bossModel_ = Model::CreateFromOBJ("Boss");
+	bossTailModel_ = Model::CreateFromOBJ("BossTail");
 	boss_ = new Boss();
-	boss_->Initialize(bossModel_, &camera_, player_);
-
+	boss_->Initialize(bossModel_, bossTailModel_, & camera_, player_);
 	cameraController_ = new CameraController();
 	cameraController_->SetCamera(&camera_);
 	cameraController_->Initialize();
@@ -157,6 +157,7 @@ void GameScene::Initialize() {
 
 	cameraController_->Reset();
 	UpdateLighting();
+
 }
 
 void GameScene::Update() {
@@ -195,6 +196,10 @@ void GameScene::Update() {
 	if (input->PushKey(DIK_C)) {
 		isClear_ = true;
 	}
+
+
+	//当たり判定
+	CheckAllCollisions();
 }
 
 void GameScene::SetSnowEffectFeedbackSettings(const SnowEffectFeedbackSettings& settings) {
@@ -267,6 +272,34 @@ void GameScene::Draw() {
 	effects_->Draw(camera_);
 
 	Model::PostDraw();
+}
+
+void GameScene::CheckAllCollisions() {
+
+	#pragma region 蛇の口と雪玉の当たり判定
+		{
+			for (Snow& snow : player_->GetSnows()) {
+			    const Vector3& snowPos = snow.GetPos();
+			    float snowRadius = snow.GetRadius();
+
+				if (snow.IsSizeMax()) {
+
+
+					if (IsCollisionBallToBall(snowPos,snowRadius,boss_->GetMouthPos(),boss_->GetMouthRadius())) {
+					    snow.BossMouthToSnowIsCollision();
+					    boss_->IsCollisionMouthToSnow(snow);
+
+					}		    
+				
+				}
+
+			}
+		}
+	#pragma endregion
+
+
+
+
 }
 
 void GameScene::GenerateBlocks() {

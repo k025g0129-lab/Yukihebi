@@ -42,6 +42,8 @@ public:
 	//クリアフラグのgetterを追加
 	bool IsClear() const { return isClear_; }
 
+	void CheckAllCollisions();
+
 private:
 	const Input* input = Input::GetInstance();
 	void GenerateBlocks();
@@ -65,6 +67,7 @@ private:
 	float Timer = 0.0f;
 	CameraController* cameraController_;
 	Model* bossModel_ = nullptr;
+	Model* bossTailModel_ = nullptr;
 	Boss* boss_ = nullptr;
 
 	//終了フラグ

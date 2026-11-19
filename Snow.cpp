@@ -1,4 +1,4 @@
-﻿#include "Snow.h"
+#include "Snow.h"
 #include <algorithm>
 #include <cmath>
 #include "MapChipField.h"
@@ -116,10 +116,24 @@ void Snow::UpdateHeld(const Vector3& playerPosition, const Vector3& playerVeloci
 	PrepareDraw();
 }
 
-void Snow::PlayerToSnowCollision(const Vector3& playerposition, const Vector3& playerVelocity, float playerHalfWidth) {
+bool Snow::IsSizeMax() const { 
+		
+	if (radius_ >= settings_.maxRadius) {
+		return true;
+	
+	} else {
+		return false;
+	
+	}
+
+	//return false; 
+}
+
+void Snow::PlayerToSnowCollision(const Vector3& playerposition, float playerHalfWidth) {
 	if (state_ == State::kPushed) {
 		return; // 持って転がしている雪玉には、この接触処理を重ねない
 	}
+
 	const Vector3 minimum = {
 		+playerposition.x - playerHalfWidth, +playerposition.y - playerHalfWidth, +playerposition.z - playerHalfWidth
 	};
@@ -227,7 +241,7 @@ void Snow::SnowToSnowCollision(Snow& other) {
 	other.PrepareDraw();
 }
 
-void Snow::Release() {
+
 	if (state_ == State::kPushed) {
 		state_ = State::kFree;
 		// Space中に得た速度と回転をそのまま引き継ぐ。
