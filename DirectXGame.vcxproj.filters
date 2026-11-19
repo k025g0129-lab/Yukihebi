@@ -1,6 +1,32 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
+    <ClCompile Include="Boss.cpp" />
+    <ClCompile Include="GameMath.cpp" />
+    <ClCompile Include="GameScene.cpp" />
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="MapChipField.cpp" />
+    <ClCompile Include="MapCollider.cpp" />
+    <ClCompile Include="Player.cpp" />
+    <ClCompile Include="Snow.cpp" />
+    <ClCompile Include="TitleScene.cpp" />
+    <ClCompile Include="ClearScene.cpp" />
+    <ClCompile Include="TutorialScene.cpp" />
+    <ClCompile Include="Fade.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="GameMath.h" />
+    <ClInclude Include="GameScene.h" />
+    <ClInclude Include="MapChipField.h" />
+    <ClInclude Include="MapCollider.h" />
+    <ClInclude Include="Player.h" />
+    <ClInclude Include="Snow.h" />
+    <ClInclude Include="Boss.h" />
+    <ClInclude Include="TitleScene.h" />
+    <ClInclude Include="ClearScene.h" />
+    <ClInclude Include="TutorialScene.h" />
+    <ClInclude Include="Fade.h" />
+
     <ClCompile Include="Boss.cpp">
       <Filter>ソースファイル</Filter>
     </ClCompile>

@@ -19,6 +19,18 @@ public:
 	void Update();
 	void Draw();
 
+
+public:
+
+	//デストラクタのgetter
+	bool IsFinished() const { return finished_; }
+
+	//チュートリアルのgetter
+	bool IsTutorial() const { return tutorial_; }
+
+	//クリアフラグのgetterを追加
+	bool IsClear() const { return isClear_; }
+
 private:
 	void GenerateBlocks();
 	std::unique_ptr<LightGroup> playerLightGroup_;
@@ -37,10 +49,21 @@ private:
 	CameraController* cameraController_;
 	Model* bossModel_ = nullptr;
 	Boss* boss_ = nullptr;
+
+	//終了フラグ
+	bool finished_ = false;
+
+	//クリアフラグ
+	bool isClear_ = false;
+
+	//チュートリアルフラグ
+	bool tutorial_ = false;
+
 	Effects* effects_ = nullptr;
 	Camera camera_;
 	void InitializePlayerLighting();
 	/// <summary>ステージ全体を1方向から照らす平行光源を設定する。</summary>
 	void InitializeDirectionalLight();
 	void UpdateLighting();
+ 
 };
