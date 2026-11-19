@@ -1,40 +1,92 @@
 #pragma once
-#include "GameMath.h"
 
-class Stage;
+#include "KamataEngine.h"
+using namespace KamataEngine;
 
-// 表示階層だけを所有する。ボールの存在階層を書き換えない。
+class Player;
+class Enemy;
+class Bomb;
+class Core;
+
 class CameraController {
 public:
-	// 最初は球の所属階層を表示する。以後は手動切替と実際の階層移動を区別する。
-	void Initialize(const GameSettings& settings, const Stage& stage, int ballLayer, const Vector3& ballPosition);
-	// 【現在は未使用】スペースはショットに使うため、表示階層は球に自動追従する。
-	// 表示階層を順に巡回するだけで、球の座標・速度・階層は変えない。
-	void SwitchLayer(int layerCount);
-	void FollowBallLayer(int ballLayer);
-	// 小さいマップは中央を、広いマップは球の周辺を注視して見下ろす。
-	void Update(float deltaTime, const Stage& stage, const Vector3& ballPosition);
-	// 打った向きへ注視点を一時的にずらす。Updateで元の位置へ戻る。
-	void AddKick(const Vector3& direction, float distance);
-	// 当たりの強さ(0～1)で注視点を揺らす。より強い揺れが残っている間は上書きしない。
-	void AddShake(float strength);
-	// ゴール時に、ヒットストップと一緒に残るキック・揺れを消す。
-	void ClearImpact();
-	int GetDisplayLayer() const { return displayLayer_; }
-	const Camera& GetCamera() const { return camera_; }
+	struct MapImpactShakeSettings {
+		// 衝突速度はワールド単位/秒、振幅はワールド単位、時間はフレーム数。
+		float minImpactSpeed = 4.0f;
+		float amplitudePerSpeed = 0.015f;
+		float maxAmplitude = 0.3f;
+		float durationFrames = 10.0f;
+	};
+
+	// <summary>
+	// 初期化
+	// </summary>
+	void Initialize();
+
+	// <summary>
+	// 更新
+	// </summary>
+	void Update();
+	// 結果画面では追従せず、本編と同じ Shake だけ固定カメラへ適用する。
+	void UpdateShakeOnly(const Vector3& basePosition);
+	const Vector3& GetFollowPosition() const { return followPosition_; }
+
+	// 目標プレイヤー
+	Player* target_ = nullptr;
+	void SetTarget(Player* target) { target_ = target; }
+
+
+	void Reset();
+
+	void RequestShake(float amplitude, float durationFrames);
+	void RequestImpactKick(const Vector3& surfaceNormal, float amplitude, float retention);
+	void RequestMapImpactShake(float impactSpeed);
+	void SetMapImpactShakeSettings(const MapImpactShakeSettings& settings);
+	void SetPlayerVerticalFocusMargin(float verticalMargin);
+	// 追従対象とカメラの座標の差
+	Vector3 targetOffset_ = {0, 30.0f, -5.0f};
+	void SetCamera(Camera* camera) { camera_ = camera; }
+
+	struct Rect {
+		float left = 0.0f;
+		float top = 1.0f;
+		float right = 10.0f;
+		float bottom = 0.0f;
+	};
+
+	Rect movableArea_ = {0, 100, 0, 100};
+
+	void SetMovableArea(const Rect& area) { movableArea_ = area; }
+
+	// カメラの目標座標
+	Vector3 targetPosition_ = {};
+
+	static constexpr float kInterpolationRate = 0.1f;
+
+	static constexpr float kVelocityBias = 0.5f;
+	WorldTransform worldTransform_;
+	static constexpr Rect margin = {
+		.left = -10.0f,
+		.top = 10.0f,
+		.right = 10.0f,
+		.bottom = -10.0f,
+	};
+	const Camera* GetCamera() const { return camera_; }
 
 private:
-	Vector3 CalculateTarget(const Stage& stage, const Vector3& ballPosition) const;
-	GameSettings settings_{};
-	Camera camera_{};
-	// 補間中の注視点のワールド位置。大きいマップだけ球のXZ位置に追従する。
-	Vector3 target_{};
-	int displayLayer_ = 0;
-	// 球の実際の階層移動を検出するための前回値。手動表示切替では変更しない。
-	int previousBallLayer_ = 0;
-	bool initialized_ = false;
-	// 注視点に足す一時的なずれ。cameraKickReturnSpeedで0へ戻る。
-	Vector3 kick_{};
-	// 揺れの残り強さ(0～1)。毎秒cameraShakeDecayずつ減る。
-	float shake_ = 0.0f;
+	// マップの四辺から、画面全体が収まるカメラ中心の範囲を求める。
+	Vector3 ClampToMovableArea(const Vector3& position) const;
+	Vector3 Shake();
+	Vector3 followPosition_{};
+	// ジャンプ中に小さな上下動を追わないための仮想の注視点。
+	float playerFocusY_ = 0.0f;
+	float playerVerticalFocusMargin_ = 3.0f;
+	float shakeAmplitude_ = 0.0f;
+	float shakeDurationFrames_ = 0.0f;
+	float shakeRemainingFrames_ = 0.0f;
+	Vector3 impactKickOffset_{};
+	float impactKickRetention_ = 0.72f;
+	MapImpactShakeSettings mapImpactShakeSettings_{};
+	// カメラ
+	Camera* camera_ = nullptr;
 };

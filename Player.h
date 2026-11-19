@@ -35,6 +35,8 @@ public:
 	void SetMaxFallSpeed(float speed) { maxFallSpeed_ = speed; } // 最大落下速度を設定する
 
 	Vector3 GetVector3() { return worldTransform_.translation_; };
+	const WorldTransform& GetWorldTransform() const { return worldTransform_; }
+	const Vector3& GetVelocity() const { return velocity_; }
 
 private:
 	//==========================
@@ -52,6 +54,7 @@ private:
 	float maxFallSpeed_ = 1.0f; // 最大落下速度
 	float verticalSpeed_ = 0.0f; // Y方向の速度
 	Vector3 facing_ = {0.0f, 0.0f, 1.0f}; // 最後に向いていた方向
+	Vector3 velocity_ = {}; // プレイヤーの速度
 	Snow* snow_ = nullptr; // プレイヤーが持っている雪玉のポインタ。nullptr の場合は、雪玉を持っていない
 	std::list<Snow> snows_; // プレイヤーが生成した雪玉のリスト。雪玉を置いた場合でも、snows_ の要素は消さない
 	// snows_ の要素があるかどうかを保持するフラグ。snows_ の要素がある場合は true、ない場合は false

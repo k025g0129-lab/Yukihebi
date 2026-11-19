@@ -45,7 +45,7 @@ public:
 	};
 
 	void SetSettings(const Settings& settings) { settings_ = settings; }
-	void Release();
+	void Release(const Vector3& PlayerVelocity, const Vector3& PlayerRotation);
 
 	//==========================
 	// コンストラクタ・デストラクタ

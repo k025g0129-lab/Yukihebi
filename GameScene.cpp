@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include "Boss.h"
+#include  "CameraController.h"
 #include "GameMath.h"
 #include "Player.h"
 
@@ -18,16 +19,13 @@ GameScene::~GameScene() {
 
 
 void GameScene::Initialize() {
-	// XZ 平面を見下ろす固定カメラ。画面の上が +Z 方向になる。
-	camera_.Initialize();
-	camera_.translation_ = {0.0f, 16.0f, -7.0f};
-	camera_.rotation_ = {1.16f, 0.0f, 0.0f};
-	camera_.UpdateMatrix();
-	camera_.TransferMatrix();
+	InitializePlayerLighting();
 
 
 	// CSV のマップチップからブロックを生成する。
 	mapChipField_.LoadMapChipCSV("Resources/floor.csv");
+	const float halfMapWidth = mapChipField_.GetLoadedBlockHorizontal() * MapChipField::kBlockWindth * 0.5f;
+	const float halfMapDepth = mapChipField_.GetLoadedBlockVirtical() * MapChipField::kBlockHeight * 0.5f;
 	modelBlock_.reset(Model::CreateFromOBJ("cube"));
 	GenerateBlocks();
 
@@ -44,6 +42,23 @@ void GameScene::Initialize() {
 	bossModel_ = Model::CreateFromOBJ("Boss");
 	bossTailModel_ = Model::CreateFromOBJ("BossTail");
 	boss_ = new Boss();
+	boss_->Initialize(bossModel_, &camera_, player_);
+
+	cameraController_ = new CameraController();
+	cameraController_->SetCamera(&camera_);
+	cameraController_->Initialize();
+	cameraController_->SetTarget(player_);
+	cameraController_->targetOffset_ = {0.0f, 15.0f, -6.0f};
+
+	CameraController::Rect movableArea{};
+	movableArea.left = -halfMapWidth;
+	movableArea.right = halfMapWidth;
+	movableArea.bottom = -halfMapDepth;
+	movableArea.top = halfMapDepth;
+	cameraController_->SetMovableArea(movableArea);
+
+	cameraController_->Reset();
+	UpdateLighting();
 	boss_->Initialize(bossModel_, bossTailModel_, & camera_, player_);
 }
 
@@ -58,7 +73,7 @@ void GameScene::Update() {
 		player_->UpdateSnowPhysics(kSnowPhysicsStep, mapChipField_);
 		snowPhysicsAccumulator_ -= kSnowPhysicsStep;
 	}
-
+	cameraController_->Update();
 	boss_->Update();
 }
 
@@ -115,4 +130,42 @@ void GameScene::GenerateBlocks() {
 			worldTransformBlocks_[row][column] = std::move(block);
 		}
 	}
+}
+
+void GameScene::InitializePlayerLighting() {
+	playerLightGroup_.reset(LightGroup::Create());
+	// 環境光は全方向の基礎の明るさ。平行光源とは別に調節する。
+	playerLightGroup_->SetAmbientColor({0.5f, 0.5f, 0.5f});
+	InitializeDirectionalLight();
+	for (int i = 0; i < LightGroup::kPointLightNum; ++i) {
+		playerLightGroup_->SetPointLightActive(i, i == 0);
+	}
+	for (int i = 0; i < LightGroup::kSpotLightNum; ++i) {
+		playerLightGroup_->SetSpotLightActive(i, false);
+	}
+	for (int i = 0; i < LightGroup::kCircleShadowNum; ++i) {
+		playerLightGroup_->SetCircleShadowActive(i, false);
+	}
+	playerLightGroup_->SetPointLightColor(0, {1.0f, 0.90f, 0.72f});
+}
+
+void GameScene::InitializeDirectionalLight() {
+	// ゲームシーンの平行光源の調節箇所。位置はなく、全体に同じ方向から光が届く。
+	constexpr Vector3 direction{-0.3f, 1.0f, -0.4f}; // 光が進む方向（ゼロベクトル不可）
+	constexpr Vector3 color{1.0f, 0.0f, 0.0f}; // RGB
+	constexpr float intensity = 10.0f; // 0で消灯、値を上げるほど明るくなる
+
+	for (int i = 0; i < LightGroup::kDirLightNum; ++i) {
+		playerLightGroup_->SetDirLightActive(i, i == 0);
+	}
+	playerLightGroup_->SetDirLightDir(0, direction);
+	playerLightGroup_->SetDirLightColor(0, color * intensity);
+}
+
+void GameScene::UpdateLighting() {
+	modelBlock_->SetLightGroup(playerLightGroup_.get());
+	playerModel_->SetLightGroup(playerLightGroup_.get());
+	snowModel_->SetLightGroup(playerLightGroup_.get());
+	bossModel_->SetLightGroup(playerLightGroup_.get());
+	playerLightGroup_->Update();
 }
