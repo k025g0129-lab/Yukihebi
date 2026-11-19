@@ -1,7 +1,6 @@
 #include "GameScene.h"
 
 #include <algorithm>
-#include <cmath>
 #include <vector>
 #include "Boss.h"
 #include  "CameraController.h"
@@ -9,61 +8,94 @@
 #include "GameMath.h"
 #include "Player.h"
 
-namespace {
-	// 雪玉の通知を見た目へ変換する場所。粒の設定はここでまとめて調整する。
-	void SpawnSnowEffect(Effects& effects, const Snow::EffectEvent& event) {
-		int particleCount = 0;
-		Vector4 color{};
-		float lifeTime = 0.0f;
-		float gravity = 0.0f;
 
+namespace {
+	// 接触面に沿う3D方向を選び、法線方向には少しだけ揺らぎを加える。
+	// 法線の正負へ強く飛ばすと、粒が雪玉やPlayerの内部に入って隠れる。
+	Vector3 ScatterAlongContact(const Vector3& normal, float normalSpread) {
+		const Vector3 axis = Normalize(normal);
+		Vector3 tangent{};
+		do {
+			const Vector3 randomDirection = Random::Direction();
+			tangent = randomDirection - axis * Dot(randomDirection, axis);
+		}
+		while (LengthSquared(tangent) < 0.000001f);
+		return Normalize(Normalize(tangent) + axis * Random::Float(-normalSpread, normalSpread));
+	}
+
+	void SpawnPlayerSnowEffect(Effects& effects, const Snow::EffectEvent& event) {
+		const float power = std::clamp(event.impactSpeed / 6.0f, 0.0f, 1.0f);
+		const int count = 15 + static_cast<int>(power * 20.0f);
+		const Vector3 contact = event.position;
+		const float size = 0.02f + event.radius * 0.05f;
+
+		// 接点の短い閃光の後、Playerと雪玉の接触面に沿って飛散する。
+		effects.Spawn({
+			contact, {}, {1.0f, 0.95f, 0.8f, 1.0f},
+			0.05f + event.radius * 0.12f, 0.1f, 0.0f
+		});
+		for (int index = 0; index < count; ++index) {
+			const Vector3 direction = ScatterAlongContact(event.normal, 0.18f);
+			const float speed = Random::Float(0.9f, 2.0f + power * 4.5f);
+			const Vector3 position = contact + direction * 0.03f;
+			if (!effects.Spawn({
+				position, direction * speed, {1.0f, 0.75f, 0.55f, 1.0f},
+				size, Random::Float(0.16f, 0.3f), 3.0f
+			})) {
+				break;
+			}
+		}
+	}
+
+	void SpawnSnowSnowEffect(Effects& effects, const Snow::EffectEvent& event) {
+		const float power = std::clamp(event.impactSpeed / 6.0f, 0.0f, 1.0f);
+		const int count = 10 + static_cast<int>(power * 20.0f);
+		const float size = 0.04f + event.radius * 0.045f;
+
+		// 二つの雪玉の接点から、球面の接線方向へ立体的に散らす。
+		effects.Spawn({
+			event.position, {}, {0.9f, 0.97f, 1.0f, 1.0f},
+			0.05f + event.radius * 0.08f, 0.09f, 0.0f
+		});
+		for (int index = 0; index < count; ++index) {
+			const Vector3 direction = ScatterAlongContact(event.normal, 0.25f);
+			const Vector3 position = event.position + direction * 0.03f;
+			const float speed = Random::Float(1.0f, 2.3f + power * 5.5f);
+			if (!effects.Spawn({
+				position, direction * speed, {0.62f, 0.88f, 1.0f, 1.0f},
+				size, Random::Float(0.18f, 0.36f), 3.5f
+			})) {
+				break;
+			}
+		}
+	}
+
+	void SpawnMaxSizeEffect(Effects& effects, const Snow::EffectEvent& event) {
+		// 最大サイズ到達時は雪玉の表面全体から外へ飛ぶ。
+		for (int index = 0; index < 24; ++index) {
+			const Vector3 direction = Random::Direction();
+			const Vector3 position = event.position + direction * (event.radius * 1.02f);
+			const Vector3 velocity = direction * Random::Float(1.3f, 2.8f);
+			if (!effects.Spawn({
+				position, velocity, {1.0f, 0.88f, 0.35f, 1.0f},
+				0.035f + event.radius * 0.045f, Random::Float(0.4f, 0.65f), 0.8f
+			})) {
+				break;
+			}
+		}
+	}
+
+	void SpawnSnowEffect(Effects& effects, const Snow::EffectEvent& event) {
 		switch (event.type) {
 		case Snow::EffectType::kPlayerHit:
-			particleCount = 12;
-			color = {1.0f, 0.73f, 0.52f, 0.95f};
-			lifeTime = 0.32f;
-			gravity = 3.0f;
+			SpawnPlayerSnowEffect(effects, event);
 			break;
 		case Snow::EffectType::kSnowHit:
-			particleCount = 16;
-			color = {0.62f, 0.88f, 1.0f, 0.9f};
-			lifeTime = 0.42f;
-			gravity = 2.0f;
+			SpawnSnowSnowEffect(effects, event);
 			break;
 		case Snow::EffectType::kMaxSize:
-			particleCount = 24;
-			color = {1.0f, 0.88f, 0.35f, 1.0f};
-			lifeTime = 0.65f;
-			gravity = 0.8f;
+			SpawnMaxSizeEffect(effects, event);
 			break;
-		}
-
-		const float impact = std::clamp(event.impactSpeed, 0.0f, 8.0f);
-		for (int index = 0; index < particleCount; ++index) {
-			const float angle = kTwoPi * static_cast<float>(index) / static_cast<float>(particleCount);
-			const Vector3 outward = {std::cos(angle), 0.0f, std::sin(angle)};
-
-			Vector3 position = event.position;
-			Vector3 velocity{};
-
-			if (event.type == Snow::EffectType::kMaxSize) {
-				// 最大サイズでは雪玉の周囲から金色の輪が広がる。
-				position += outward * (event.radius * 0.75f);
-				velocity = outward * 2.0f + Vector3{0.0f, 1.2f, 0.0f};
-			}
-			else if (event.type == Snow::EffectType::kPlayerHit) {
-				// Playerとの接触では接触面から外向きに短く散らす。
-				velocity = event.normal * (0.8f + impact * 0.25f) + outward * 0.8f
-					+ Vector3{0.0f, 20.0f, 0.0f};
-			}
-			else {
-				// 雪玉同士では接点を中心に冷たい色の粒を広げる。
-				velocity = event.normal * (impact * 0.15f) + outward * (1.1f + impact * 0.2f)
-					+ Vector3{0.0f, 0.65f, 0.0f};
-			}
-
-			const float size = 0.035f + event.radius * 0.045f;
-			effects.Spawn({position, velocity, color, size, lifeTime, gravity});
 		}
 	}
 } // namespace
