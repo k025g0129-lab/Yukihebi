@@ -225,6 +225,8 @@ void Player::UpdateSnowPhysics(float deltaTime, MapChipField& map) {
 	for (Snow& snow : snows_) {
 		snow.UpdatePhysics(deltaTime, map, worldTransform_.translation_, velocity_,
 		                   worldTransform_.scale_.x);
+		if (snow.GetWorldTransform().translation_.y < -5.0f) {
+		}
 	}
 
 	for (auto first = snows_.begin(); first != snows_.end(); ++first) {

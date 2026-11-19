@@ -114,6 +114,7 @@ GameScene::~GameScene() {
 
 
 void GameScene::Initialize() {
+	input = Input::GetInstance();
 	InitializePlayerLighting();
 
 
@@ -132,6 +133,7 @@ void GameScene::Initialize() {
 	player_->SetMapChipField(&mapChipField_);
 	previousTime_ = std::chrono::steady_clock::now();
 	snowPhysicsAccumulator_ = 0.0f;
+	hitStopRemainingSeconds_ = 0.0f;
 
 	effects_ = new Effects();
 	effects_->Initialize();
@@ -162,6 +164,12 @@ void GameScene::Update() {
 	const float elapsed = +std::chrono::duration<float>(now - previousTime_).count();
 	previousTime_ = now;
 	const float deltaTime = std::clamp(elapsed, 0.0f, 0.05f);
+	if (UpdateHitStop(deltaTime)) {
+		// 世界の時間だけ止める。揺れは実フレームで進め、粒の描画状態は保持する。
+		effects_->Update(0.0f);
+		cameraController_->UpdateShakeOnly(cameraController_->GetFollowPosition());
+		return;
+	}
 	player_->Update(deltaTime);
 	UpdateLighting();
 	snowPhysicsAccumulator_ += deltaTime;
@@ -173,10 +181,70 @@ void GameScene::Update() {
 	player_->DrainSnowEffectEvents(snowEffectEvents);
 	for (const Snow::EffectEvent& event : snowEffectEvents) {
 		SpawnSnowEffect(*effects_, event);
+		RequestSnowEffectFeedback(event);
+	}
+	if (hitStopRemainingSeconds_ > 0.0f) {
+		// 衝突が起きたフレームから停止し、生成直後の粒を接点に表示する。
+		effects_->Update(0.0f);
+		cameraController_->UpdateShakeOnly(cameraController_->GetFollowPosition());
+		return;
 	}
 	effects_->Update(deltaTime);
 	cameraController_->Update();
 	boss_->Update();
+	if (input->PushKey(DIK_C)) {
+		isClear_ = true;
+	}
+}
+
+void GameScene::SetSnowEffectFeedbackSettings(const SnowEffectFeedbackSettings& settings) {
+	snowEffectFeedbackSettings_ = settings;
+	snowEffectFeedbackSettings_.playerHitStopSeconds = (std::max)(0.0f, settings.playerHitStopSeconds);
+	snowEffectFeedbackSettings_.snowHitStopSeconds = (std::max)(0.0f, settings.snowHitStopSeconds);
+	snowEffectFeedbackSettings_.maxSizeHitStopSeconds = (std::max)(0.0f, settings.maxSizeHitStopSeconds);
+	snowEffectFeedbackSettings_.playerShakeAmplitude = (std::max)(0.0f, settings.playerShakeAmplitude);
+	snowEffectFeedbackSettings_.snowShakeAmplitude = (std::max)(0.0f, settings.snowShakeAmplitude);
+	snowEffectFeedbackSettings_.maxSizeShakeAmplitude = (std::max)(0.0f, settings.maxSizeShakeAmplitude);
+	snowEffectFeedbackSettings_.shakeDurationFrames = (std::max)(0.0f, settings.shakeDurationFrames);
+	snowEffectFeedbackSettings_.fullStrengthImpactSpeed = (std::max)(0.001f, settings.fullStrengthImpactSpeed);
+}
+
+void GameScene::RequestHitStop(float durationSeconds) {
+	hitStopRemainingSeconds_ = (std::max)(hitStopRemainingSeconds_, durationSeconds);
+}
+
+bool GameScene::UpdateHitStop(float deltaTime) {
+	if (hitStopRemainingSeconds_ <= 0.0f) {
+		return false;
+	}
+	hitStopRemainingSeconds_ = (std::max)(0.0f, hitStopRemainingSeconds_ - deltaTime);
+	return true;
+}
+
+void GameScene::RequestSnowEffectFeedback(const Snow::EffectEvent& event) {
+	float stopSeconds = 0.0f;
+	float shakeAmplitude = 0.0f;
+	float strength = 1.0f;
+	switch (event.type) {
+	case Snow::EffectType::kPlayerHit:
+		//stopSeconds = snowEffectFeedbackSettings_.playerHitStopSeconds;
+		//shakeAmplitude = snowEffectFeedbackSettings_.playerShakeAmplitude;
+		break;
+	case Snow::EffectType::kSnowHit:
+		stopSeconds = snowEffectFeedbackSettings_.snowHitStopSeconds;
+		shakeAmplitude = snowEffectFeedbackSettings_.snowShakeAmplitude;
+		break;
+	case Snow::EffectType::kMaxSize:
+		stopSeconds = snowEffectFeedbackSettings_.maxSizeHitStopSeconds;
+		shakeAmplitude = snowEffectFeedbackSettings_.maxSizeShakeAmplitude;
+		break;
+	}
+	if (event.type != Snow::EffectType::kMaxSize) {
+		strength = std::clamp(
+			event.impactSpeed / snowEffectFeedbackSettings_.fullStrengthImpactSpeed, 0.0f, 1.0f);
+	}
+	RequestHitStop(stopSeconds * strength);
+	cameraController_->RequestShake(shakeAmplitude * strength, snowEffectFeedbackSettings_.shakeDurationFrames);
 }
 
 

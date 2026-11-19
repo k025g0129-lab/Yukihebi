@@ -1,4 +1,4 @@
-#include "CameraController.h"
+﻿#include "CameraController.h"
 
 #include <algorithm>
 #include <cmath>
@@ -42,9 +42,8 @@ void CameraController::Update() {
 	followPosition_.y = std::clamp(followPosition_.y, targetPosition_.y + margin.bottom,
 	                               targetPosition_.y + margin.top);
 
-	camera_->translation_ = followPosition_ + impactKickOffset_;
 	// 反動と揺れも含めた最終位置を制限し、画面端がマップの外へ出ないようにする。
-	camera_->translation_ = ClampToMovableArea(followPosition_ + impactKickOffset_);
+	camera_->translation_ = ClampToMovableArea(followPosition_ + impactKickOffset_ + Shake());
 	impactKickOffset_ *= impactKickRetention_;
 	if (LengthSquared(impactKickOffset_) < 0.0001f) {
 		impactKickOffset_ = {};
@@ -55,12 +54,13 @@ void CameraController::Update() {
 }
 
 void CameraController::UpdateShakeOnly(const Vector3& basePosition) {
-	camera_->translation_ = basePosition + impactKickOffset_;
+	camera_->translation_ = ClampToMovableArea(basePosition + impactKickOffset_ + Shake());
 	impactKickOffset_ *= impactKickRetention_;
 	if (LengthSquared(impactKickOffset_) < 0.0001f) {
 		impactKickOffset_ = {};
 	}
 	camera_->UpdateMatrix();
+	camera_->TransferMatrix();
 }
 
 // カメラのリセット
@@ -128,6 +128,17 @@ void CameraController::RequestShake(float amplitude, float durationFrames) {
 	shakeAmplitude_ = amplitude;
 	shakeDurationFrames_ = durationFrames;
 	shakeRemainingFrames_ = durationFrames;
+}
+
+Vector3 CameraController::Shake() {
+	if (shakeRemainingFrames_ <= 0.0f || shakeDurationFrames_ <= 0.0f) {
+		return {};
+	}
+
+	// 上から見た画面の横と縦に相当するX/Z方向を揺らす。
+	const float strength = shakeAmplitude_ * shakeRemainingFrames_ / shakeDurationFrames_;
+	shakeRemainingFrames_ = (std::max)(0.0f, shakeRemainingFrames_ - 1.0f);
+	return {Random::Float(-strength, strength), 0.0f, Random::Float(-strength, strength)};
 }
 
 void CameraController::RequestImpactKick(

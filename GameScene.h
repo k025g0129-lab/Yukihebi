@@ -1,9 +1,10 @@
-#pragma once
+﻿#pragma once
 #include <KamataEngine.h>
 #include <chrono>
 #include <memory>
 #include <vector>
 #include "MapChipField.h"
+#include "Snow.h"
 using namespace KamataEngine;
 
 class Player;
@@ -13,14 +14,24 @@ class Effects;
 
 class GameScene {
 public:
+	struct SnowEffectFeedbackSettings {
+		float playerHitStopSeconds = 0.035f;
+		float snowHitStopSeconds = 0.045f;
+		float maxSizeHitStopSeconds = 0.07f;
+		float playerShakeAmplitude = 0.06f;
+		float snowShakeAmplitude = 0.09f;
+		float maxSizeShakeAmplitude = 0.12f;
+		float shakeDurationFrames = 8.0f;
+		float fullStrengthImpactSpeed = 6.0f;
+	};
+
 	GameScene();
 	~GameScene();
 	void Initialize();
 	void Update();
 	void Draw();
+	void SetSnowEffectFeedbackSettings(const SnowEffectFeedbackSettings& settings);
 
-
-public:
 
 	//デストラクタのgetter
 	bool IsFinished() const { return finished_; }
@@ -32,7 +43,11 @@ public:
 	bool IsClear() const { return isClear_; }
 
 private:
+	const Input* input = Input::GetInstance();
 	void GenerateBlocks();
+	void RequestHitStop(float durationSeconds);
+	bool UpdateHitStop(float deltaTime);
+	void RequestSnowEffectFeedback(const Snow::EffectEvent& event);
 	std::unique_ptr<LightGroup> playerLightGroup_;
 
 	MapChipField mapChipField_{};
@@ -44,6 +59,8 @@ private:
 	float timer = 0.0f;
 	std::chrono::steady_clock::time_point previousTime_{};
 	float snowPhysicsAccumulator_ = 0.0f;
+	float hitStopRemainingSeconds_ = 0.0f;
+	SnowEffectFeedbackSettings snowEffectFeedbackSettings_{};
 	static constexpr float kSnowPhysicsStep = 1.0f / 120.0f;
 	float Timer = 0.0f;
 	CameraController* cameraController_;
@@ -65,5 +82,4 @@ private:
 	/// <summary>ステージ全体を1方向から照らす平行光源を設定する。</summary>
 	void InitializeDirectionalLight();
 	void UpdateLighting();
- 
 };
