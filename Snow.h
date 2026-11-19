@@ -12,7 +12,7 @@ public:
 
 	struct Settings {
 		float initialRadius = 0.2f;
-		float maxRadius = 1.0f;
+		float maxRadius = 0.5f;
 		float growthPerDistance = 0.25f;
 		float placementGap = 0.05f;
 

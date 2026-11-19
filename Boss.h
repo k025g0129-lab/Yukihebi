@@ -3,6 +3,11 @@
 #include <memory>
 #include "GameMath.h"
 #include <algorithm>
+#include <list>
+#include <iterator>
+#include <vector>
+
+
 
 #include <cmath>
 #include "BossTail.h"
@@ -28,6 +33,12 @@ enum RushAttack {
 	Rush,
 };
 
+struct Footprint {
+	Vector3 pos;
+	Vector3 rot;
+	
+};
+
 
 
 class Boss {
@@ -35,7 +46,7 @@ public:
 	Boss();
 	~Boss();
 
-	void Initialize(Model* model, const Camera* camera,Player* player);
+	void Initialize(Model* model, Model* tailModel, const Camera* camera, Player* player);
 	void Update();
 	void Draw();
 
@@ -43,9 +54,14 @@ public:
 	void TrackingWalkUpdate();
 	void DushMove();
 
+	//ラッシュ
 	void RushUpdate();
 
+	//尻尾
+	void AddTail();
+
 	const WorldTransform& GetWorldTransform() { return worldTransform_; };
+	const Vector3 GetMouthPos();
 
 
 private:
@@ -62,6 +78,9 @@ private:
 
 	Player* player_;
 
+	//ステータス
+	int hp = 5;
+
 	//追従
 	static inline const float kMaxWalkSpeed = 0.03f;
 	static inline const float kMaxTurnAngle = 0.05f;
@@ -75,9 +94,18 @@ private:
 
 
 	//尻尾
-	std::list <BossTail> bossTails_;
+	Model* tailModel_ = nullptr;
+	std::vector<std::unique_ptr<BossTail>> bossTails_;
 	BossTail* bossTail_;
-	static inline const int kInitializeMaxTail = 5;
+	static inline const int kDefaultMaxTail = 5;
+	static inline const int kMaxTail = 15;
+	static inline const int kTailInterval = 30;
+	static inline const int kMaxFootprint = kMaxTail * kTailInterval + 1;
+	std::list < Footprint >footprints_; 
+
+	//口
+	BossTail mouth;
+	static inline const float kMouthRange = 1.0f;
 
 
 };
