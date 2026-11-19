@@ -81,10 +81,24 @@ void Snow::UpdateHeld(const Vector3& playerPosition, float playerYaw, float move
 	worldTransform_.TransferMatrix();
 }
 
+bool Snow::IsSizeMax() const { 
+		
+	if (radius_ >= settings_.maxRadius) {
+		return true;
+	
+	} else {
+		return false;
+	
+	}
+
+	//return false; 
+}
+
 void Snow::PlayerToSnowCollision(const Vector3& playerposition, float playerHalfWidth) {
 	if (state_ == State::kPushed) {
 		return; // 持って転がしている雪玉には、この接触処理を重ねない
 	}
+
 	const Vector3 minimum = {
 		+playerposition.x - playerHalfWidth, +playerposition.y - playerHalfWidth, +playerposition.z - playerHalfWidth
 	};
@@ -163,6 +177,11 @@ void Snow::SnowToSnowCollision(Snow& other) {
 	}
 
 	PrepareDraw();
+}
+
+void Snow::BossMouthToSnowIsCollision() {
+	
+
 }
 
 void Snow::Release(const Vector3& PlayerVelocity, const Vector3& PlayerRotation) {

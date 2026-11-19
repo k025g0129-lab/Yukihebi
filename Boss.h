@@ -6,7 +6,7 @@
 #include <list>
 #include <iterator>
 #include <vector>
-
+#include <cstddef>
 
 
 #include <cmath>
@@ -14,6 +14,7 @@
 
 
 class Player;
+class Snow;
 
 using namespace KamataEngine;
 
@@ -60,9 +61,17 @@ public:
 	//尻尾
 	void AddTail();
 
+
+	//セッター
 	const WorldTransform& GetWorldTransform() { return worldTransform_; };
 	const Vector3 GetMouthPos();
 
+	std::size_t GetTailCount() const { return bossTails_.size(); }
+	const Vector3& GetTailPos(std::size_t index) const { return bossTails_[index]->GetPos(); }
+	float GetMouthRadius() const { return kMouthRadius; }
+	float GetTailRadius() const { return kTailRadius; }
+
+	void IsCollisionMouthToSnow (Snow& snow);
 
 private:
 
@@ -102,10 +111,12 @@ private:
 	static inline const int kTailInterval = 30;
 	static inline const int kMaxFootprint = kMaxTail * kTailInterval + 1;
 	std::list < Footprint >footprints_; 
+	static inline const float kTailRadius = 0.5f;
 
 	//口
 	BossTail mouth;
 	static inline const float kMouthRange = 1.0f;
+	static inline const float kMouthRadius = 0.5f;
 
 
 };

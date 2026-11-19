@@ -4,6 +4,7 @@
 #include <memory>
 #include <vector>
 #include "MapChipField.h"
+#include "GameMath.h"
 using namespace KamataEngine;
 
 class Player;
@@ -17,6 +18,8 @@ public:
 	void Initialize();
 	void Update();
 	void Draw();
+
+	void CheckAllCollisions();
 
 private:
 	void GenerateBlocks();

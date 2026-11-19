@@ -3,6 +3,7 @@
 #include "GameMath.h"
 using namespace KamataEngine;
 class MapChipField;
+class Boss;
 
 class Snow {
 public:
@@ -12,7 +13,7 @@ public:
 
 	struct Settings {
 		float initialRadius = 0.2f;
-		float maxRadius = 0.5f;
+		float maxRadius = 1.0f;
 		float growthPerDistance = 0.25f;
 		float placementGap = 0.05f;
 
@@ -82,6 +83,9 @@ public:
 	//==========================
 	const WorldTransform& GetWorldTransform() const { return worldTransform_; } // ワールド変換行列を取得する
 
+	const Vector3& GetPos() const { return position_; };
+	const float& GetRadius() const { return radius_; };
+	bool IsSizeMax() const;
 	//=====================
 	// 接触判定
 	//=====================
@@ -94,6 +98,8 @@ public:
 	/** 雪玉と雪玉の接触判定 */
 	void SnowToSnowCollision(Snow& other);
 
+	void BossMouthToSnowIsCollision();
+	
 private:
 	//==========================
 	// メンバ変数

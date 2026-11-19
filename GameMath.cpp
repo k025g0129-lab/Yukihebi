@@ -227,6 +227,22 @@ Vector3 LookRotationEuler(const Vector3& from, const Vector3& to) {
 }
 
 //========================================
+// 当たり判定
+//========================================
+
+int IsCollisionBallToBall(Vector3 pos1, float radius1, Vector3 pos2, float radius2) {
+	float dx = pos1.x - pos2.x;
+	float dy = pos1.y - pos2.y;
+	float dz = pos1.z - pos2.z;
+
+	float d = dx * dx + dy * dy + dz * dz;
+
+	float radius = radius1 + radius2;
+
+	return d <= radius * radius;
+}
+
+//========================================
 // 乱数
 //========================================
 
@@ -275,5 +291,8 @@ namespace Random {
 		const float safeRadius = (std::max)(radius, 0.0f);
 		// 立方根を掛けて、体積あたりの密度を一様にする。
 		return Direction() * (safeRadius * std::cbrt(Float()));
-	}
+    }
+
+
+
 } // namespace Random

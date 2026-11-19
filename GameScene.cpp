@@ -74,6 +74,10 @@ void GameScene::Update() {
 	}
 	cameraController_->Update();
 	boss_->Update();
+
+
+	//当たり判定
+	CheckAllCollisions();
 }
 
 
@@ -95,6 +99,34 @@ void GameScene::Draw() {
 	boss_->Draw();
 
 	Model::PostDraw();
+}
+
+void GameScene::CheckAllCollisions() {
+
+	#pragma region 蛇の口と雪玉の当たり判定
+		{
+			for (Snow& snow : player_->GetSnows()) {
+			    const Vector3& snowPos = snow.GetPos();
+			    float snowRadius = snow.GetRadius();
+
+				if (snow.IsSizeMax()) {
+
+
+					if (IsCollisionBallToBall(snowPos,snowRadius,boss_->GetMouthPos(),boss_->GetMouthRadius())) {
+					    snow.BossMouthToSnowIsCollision();
+					    boss_->IsCollisionMouthToSnow(snow);
+
+					}		    
+				
+				}
+
+			}
+		}
+	#pragma endregion
+
+
+
+
 }
 
 void GameScene::GenerateBlocks() {

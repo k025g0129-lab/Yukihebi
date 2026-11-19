@@ -194,3 +194,11 @@ const Vector3 Boss::GetMouthPos() {
 	
 	return re; 
 }
+
+void Boss::IsCollisionMouthToSnow(Snow& snow) {
+
+
+	(void)snow;
+	AddTail();
+
+}

@@ -19,6 +19,7 @@ public:
 	void Draw();
 
 	void SetPos(const Vector3 pos) { worldTransform_.translation_ = pos; };
+	Vector3 GetPos() { return worldTransform_.translation_; };
 	void SetColor(const Vector4 color) { color_.SetColor(color); };
 	
 

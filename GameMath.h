@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <KamataEngine.h>
 
@@ -109,6 +109,12 @@ float MoveTowards(float current, float target, float maximumDelta);
 // Camera は注視点を取れないので、角度へ直して rotation_ に入れる。
 Vector3 LookRotationEuler(const Vector3& from, const Vector3& to);
 
+
+//========================================
+// 当たり判定
+//========================================
+int IsCollisionBallToBall(Vector3 pos1, float radius1, Vector3 pos2, float radius2);
+
 //========================================
 // 乱数
 //========================================
@@ -121,5 +127,7 @@ int32_t Int(int32_t minimum, int32_t maximum); // 両端を含む
 
 Vector3 Direction();                 // 一様な単位ベクトル
 Vector3 InsideSphere(float radius);  // 半径 radius の球の内部
+
+
 
 } // namespace Random
