@@ -1,6 +1,8 @@
-#pragma once
+﻿#pragma once
 #include <KamataEngine.h>
+#include <vector>
 #include "GameMath.h"
+
 using namespace KamataEngine;
 class MapChipField;
 
@@ -17,15 +19,13 @@ public:
 		float placementGap = 0.05f;
 
 		float baseMass = 1.0f;
+		float playerMass = 10.0f; // 放した雪玉をPlayerが押すときの質量比
 		float gravity = 9.8f;
-		float pushGain = 12.0f;
-		float pushResponse = 14.0f;
-		float maxPushSpeed = 8.0f;
-		float maxPushForce = 120.0f;
 
 		float friction = 0.45f;
-		float rollingResistance = 0.6f;
-		float rollingDeceleration = 1.2f;
+		float rollingResistance = 0.2f;
+		float rollingDeceleration = 0.4f;
+		float rollingMassInfluence = 0.05f; // 半径による質量増加が減速へ与える割合
 		float wallRestitution = 0.65f;
 		float floorRestitution = 0.0f;
 		float bounceThreshold = 0.5f;
@@ -35,17 +35,29 @@ public:
 		float movementStepRadiusRatio = 0.5f;
 		int maxMovementSteps = 32;
 		int collisionIterations = 4;
-		float playerContactSpeed = 2.0f;
+		float playerRestitution = 0.0f; // Playerに押されたときの反発
 		float squashAmount = 0.35f;
 		float squashTime = 0.09f;
 		float squashImpulse = 0.4f;
 
 
-		float snowContactSpeed = 0.5f;
+		float snowRestitution = 0.25f; // 雪玉同士の反発
+		float playerEffectMinSpeed = 0.35f; // Playerへの接近速度がこれ以上なら粒を出す
+		float snowEffectMinSpeed = 0.35f; // 雪玉同士の接近速度がこれ以上なら粒を出す
+	};
+
+	// 判定側は発生事実だけを通知し、粒の色や数はGameSceneで決める。
+	enum class EffectType { kPlayerHit, kSnowHit, kMaxSize };
+	struct EffectEvent {
+		EffectType type;
+		Vector3 position;
+		Vector3 normal;
+		float radius;
+		float impactSpeed;
 	};
 
 	void SetSettings(const Settings& settings) { settings_ = settings; }
-	void Release(const Vector3& PlayerVelocity, const Vector3& PlayerRotation);
+	void Release();
 
 	//==========================
 	// コンストラクタ・デストラクタ
@@ -56,24 +68,23 @@ public:
 	// メンバ関数
 	//==========================
 	void Initialize(const Vector3& position); // 初期化
-	void UpdatePhysics(float deltaTime, MapChipField& map, const Vector3& playerPosition, float playerYaw,
+	void UpdatePhysics(float deltaTime, MapChipField& map, const Vector3& playerPosition, const Vector3& playerVelocity,
 	                   float playerHalfWidth); // 更新
 	void Draw(Model* model, const Camera* camera); // 描画
+	void DrainEffectEvents(std::vector<EffectEvent>& events); // 発生済みイベントを移して消す
 	//==========================
 	// 雪玉を持っているときの位置更新
 	//==========================
-	void UpdateHeld(const Vector3& playerPosition, float playerYaw, float movedDistance, float playerHalfWidth,
-	                float floorY); // プレイヤーが雪玉を持っているときの位置更新。プレイヤーの正面方向に置く
+	void UpdateHeld(const Vector3& playerPosition, const Vector3& playerVelocity, float playerYaw,
+	                float playerHalfWidth, float floorY, float deltaTime, MapChipField* map); // Space中の押し位置と転がりを更新する
 	//==========================
 	// セッター
 	//	=========================
 	void SetGrowthPerDistance(float value) {
-		growthPerDistance_ = value;
 		settings_.growthPerDistance = value;
 	}
 
 	void SetMaxRadius(float value) {
-		maxRadius_ = value;
 		settings_.maxRadius = value;
 	}
 
@@ -81,6 +92,7 @@ public:
 	// ゲッター
 	//==========================
 	const WorldTransform& GetWorldTransform() const { return worldTransform_; } // ワールド変換行列を取得する
+	float GetMass() const; // 半径に応じた質量
 
 	//=====================
 	// 接触判定
@@ -88,8 +100,8 @@ public:
 
 
 	/** プレイヤーと雪玉の接触判定 */
-	void PlayerToSnowCollision(const Vector3& playerposition, float playerHalfWidth);
-	// プレイヤーと雪玉の接触判定。プレイヤーが雪玉に接触した場合、雪玉を持つようにする
+	void PlayerToSnowCollision(const Vector3& playerposition, const Vector3& playerVelocity,
+	                           float playerHalfWidth);
 
 	/** 雪玉と雪玉の接触判定 */
 	void SnowToSnowCollision(Snow& other);
@@ -112,14 +124,13 @@ private:
 	Vector3 rotationAcceleration_; // 雪玉の回転加速度
 
 	float radius_ = 0.2f; // 雪玉の半径
-	float growthPerDistance_ = 0.25f; // 移動距離に応じた成長量
-	float maxRadius_ = 1.0f; // 雪玉の最大半径
-	float placementGap_ = 0.05f; // プレイヤーと雪玉の間の隙間
 	enum class State { kPushed, kFree, kStopped };
 
 	void ResolveMap(MapChipField& map);
 	void PrepareDraw();
+	void NotifyMaxSizeReached(float previousRadius);
 	Settings settings_{};
 	State state_ = State::kStopped;
 	bool grounded_ = false;
+	std::vector<EffectEvent> pendingEffectEvents_;
 };
