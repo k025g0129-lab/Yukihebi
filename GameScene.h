@@ -17,6 +17,18 @@ public:
 	void Update();
 	void Draw();
 
+
+public:
+
+	//デストラクタのgetter
+	bool IsFinished() const { return finished_; }
+
+	//チュートリアルのgetter
+	bool IsTutorial() const { return tutorial_; }
+
+	//クリアフラグのgetterを追加
+	bool IsClear() const { return isClear_; }
+
 private:
 	void GenerateBlocks();
 
@@ -35,5 +47,14 @@ private:
 
 	Model* bossModel_ = nullptr;
 	Boss* boss_ = nullptr;
+
+	//終了フラグ
+	bool finished_ = false;
+
+	//クリアフラグ
+	bool isClear_ = false;
+
+	//チュートリアルフラグ
+	bool tutorial_ = false;
 
 };
