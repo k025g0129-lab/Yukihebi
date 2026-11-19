@@ -4,7 +4,6 @@
 #include <memory>
 #include <vector>
 #include "MapChipField.h"
-#include "GameMath.h"
 using namespace KamataEngine;
 
 class Player;
@@ -18,8 +17,6 @@ public:
 	void Initialize();
 	void Update();
 	void Draw();
-
-	void CheckAllCollisions();
 
 private:
 	void GenerateBlocks();
@@ -44,7 +41,4 @@ private:
 	/// <summary>ステージ全体を1方向から照らす平行光源を設定する。</summary>
 	void InitializeDirectionalLight();
 	void UpdateLighting();
-	Model* bossTailModel_ = nullptr;
-
-
 };
