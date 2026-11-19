@@ -9,6 +9,7 @@ using namespace KamataEngine;
 class Player;
 class Boss;
 class CameraController;
+class Effects;
 
 class GameScene {
 public:
@@ -28,14 +29,15 @@ private:
 	Model* playerModel_ = nullptr;
 	Model* snowModel_ = nullptr;
 	Player* player_ = nullptr;
-
+	float timer = 0.0f;
 	std::chrono::steady_clock::time_point previousTime_{};
 	float snowPhysicsAccumulator_ = 0.0f;
 	static constexpr float kSnowPhysicsStep = 1.0f / 120.0f;
-
+	float Timer = 0.0f;
 	CameraController* cameraController_;
 	Model* bossModel_ = nullptr;
 	Boss* boss_ = nullptr;
+	Effects* effects_ = nullptr;
 	Camera camera_;
 	void InitializePlayerLighting();
 	/// <summary>ステージ全体を1方向から照らす平行光源を設定する。</summary>
