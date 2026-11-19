@@ -1,10 +1,16 @@
-#include "Snow.h"
+﻿#include "Snow.h"
 #include <algorithm>
 #include <cmath>
 #include "MapChipField.h"
 Snow::Snow() = default;
 
 Snow::~Snow() {
+}
+
+float Snow::GetMass() const {
+	const float initialRadius = (std::max)(settings_.initialRadius, 0.001f);
+	const float ratio = (std::max)(radius_, 0.001f) / initialRadius;
+	return (std::max)(settings_.baseMass, 0.001f) * ratio * ratio * ratio;
 }
 
 void Snow::Initialize(const Vector3& position) {
@@ -31,6 +37,7 @@ void Snow::Initialize(const Vector3& position) {
 	squashTimer_ = 0.0f;
 	grounded_ = false;
 	state_ = State::kPushed;
+	pendingEffectEvents_.clear();
 	acceleration_ = {0.0f, -0.1f, 0.0f};
 	rotation_ = {0.0f, 0.0f, 0.0f};
 	rotationSpeed_ = {0.0f, 0.0f, 0.0f};
@@ -55,34 +62,61 @@ void Snow::Draw(Model* model, const Camera* camera) {
 	model->Draw(worldTransform_, *camera);
 }
 
+void Snow::DrainEffectEvents(std::vector<EffectEvent>& events) {
+	for (const EffectEvent& event : pendingEffectEvents_) {
+		events.push_back(event);
+	}
+	pendingEffectEvents_.clear();
+}
+
+void Snow::NotifyMaxSizeReached(float previousRadius) {
+	// 初めて上限に達した瞬間だけ通知する。上限に達した後の毎フレームは通知しない。
+	if (previousRadius < settings_.maxRadius && radius_ >= settings_.maxRadius) {
+		pendingEffectEvents_.push_back({EffectType::kMaxSize, position_, {0.0f, 1.0f, 0.0f}, radius_, 0.0f});
+	}
+}
+
 //===========================
 // 雪玉を持っているときの位置更新
 //===========================
-void Snow::UpdateHeld(const Vector3& playerPosition, float playerYaw, float movedDistance, float playerHalfWidth,
-                      float floorY) {
-	// 移動距離に応じて雪玉の半径を成長させる。最大半径を超えないように制限する。
-	radius_ = (std::min)(radius_ + movedDistance * growthPerDistance_, maxRadius_);
-	// 移動距離に応じた成長量を加算する。最大半径を超えないように制限する。
-
+void Snow::UpdateHeld(const Vector3& playerPosition, const Vector3& playerVelocity, float playerYaw,
+                      float playerHalfWidth, float floorY, float deltaTime, MapChipField* map) {
+	const Vector3 previousPosition = position_;
 	// Playerの表示上の正面方向（+Zを正面とする）
 	const Vector3 forward = {std::sin(playerYaw), 0.0f, std::cos(playerYaw)}; // プレイヤーの正面方向の単位ベクトルを計算する。
 
 	// 雪玉の位置をプレイヤーの正面方向に置く。プレイヤーと雪玉の間に隙間を設ける。
-	position_ = playerPosition + forward * (playerHalfWidth + radius_ + placementGap_);
-	// 雪玉の位置をプレイヤーの正面方向に置く。プレイヤーと雪玉の間に隙間を設ける。
+	position_ = playerPosition + forward * (playerHalfWidth + radius_ + settings_.placementGap);
 	position_.y = floorY + radius_; // 雪玉の位置のY座標を床の上に置く。雪玉の半径分だけ上に置く。
 
-	//===========================
-	// ワールド変換行列を更新
-	//===========================
-	worldTransform_.translation_ = position_; // 雪玉の位置を更新する
-	worldTransform_.scale_ = {radius_, radius_, radius_}; // 雪玉の大きさを更新する
-	worldTransform_.matWorld_ = MakeAffineMatrix(worldTransform_.scale_, worldTransform_.rotation_,
-	                                             worldTransform_.translation_); // ワールド変換行列を更新する
-	worldTransform_.TransferMatrix();
+	// 押している間は慣性で正面から離れない。壁・床との重なりは配置後に解消する。
+	velocity_ = {};
+	grounded_ = false;
+	if (map != nullptr) {
+		ResolveMap(*map);
+	}
+
+	const Vector3 moved = {position_.x - previousPosition.x, 0.0f, position_.z - previousPosition.z};
+	const Vector3 playerHorizontal = {playerVelocity.x, 0.0f, playerVelocity.z};
+	const float playerSpeed = Length(playerHorizontal);
+	if (deltaTime > 0.0f && playerSpeed > 0.0f) {
+		// 方向転換だけで雪玉が円弧を描いても、押す速度や成長量には数えない。
+		const float pushedDistance = std::clamp(Dot(moved, playerHorizontal) / playerSpeed,
+		                                        0.0f, playerSpeed * deltaTime);
+		velocity_ = playerHorizontal * (pushedDistance / (playerSpeed * deltaTime));
+		if (grounded_) {
+			const float previousRadius = radius_;
+			radius_ = (std::min)(radius_ + pushedDistance * settings_.growthPerDistance, settings_.maxRadius);
+			position_.y += radius_ - previousRadius;
+			NotifyMaxSizeReached(previousRadius);
+		}
+	}
+	angularVelocity_ = Cross(Vector3{0.0f, 1.0f, 0.0f}, velocity_) / (std::max)(radius_, 0.001f);
+	rotation_ += angularVelocity_ * deltaTime;
+	PrepareDraw();
 }
 
-void Snow::PlayerToSnowCollsion(const Vector3& playerposition, float playerHalfWidth) {
+void Snow::PlayerToSnowCollision(const Vector3& playerposition, const Vector3& playerVelocity, float playerHalfWidth) {
 	if (state_ == State::kPushed) {
 		return; // 持って転がしている雪玉には、この接触処理を重ねない
 	}
@@ -122,25 +156,95 @@ void Snow::PlayerToSnowCollsion(const Vector3& playerposition, float playerHalfW
 		}
 	}
 	position_ += normal * (penetration + settings_.contactMargin);
-	const float outwardSpeed = Dot(velocity_, normal);
-	if (outwardSpeed < settings_.playerContactSpeed) {
-		velocity_ += normal * +(settings_.playerContactSpeed - outwardSpeed);
+	// Playerとの質量比を使い、大きい雪玉ほど接触で速度が変わりにくくする。
+	const float relativeNormalSpeed = Dot(velocity_ - playerVelocity, normal);
+	if (-relativeNormalSpeed >= settings_.playerEffectMinSpeed) {
+		pendingEffectEvents_.push_back({EffectType::kPlayerHit, position_ - normal * radius_, normal,
+		                                radius_, -relativeNormalSpeed});
+	}
+	if (relativeNormalSpeed < 0.0f) {
+		const float inverseMass = 1.0f / GetMass();
+		const float inversePlayerMass = 1.0f / (std::max)(settings_.playerMass, 0.001f);
+		const float restitution = std::clamp(settings_.playerRestitution, 0.0f, 1.0f);
+		const float impulse = -(1.0f + restitution) * relativeNormalSpeed / (inverseMass + inversePlayerMass);
+		velocity_ += normal * (impulse * inverseMass);
 	}
 	state_ = State::kFree;
+	PrepareDraw();
+}
+
+void Snow::SnowToSnowCollision(Snow& other) {
+	if (state_ == State::kPushed && other.state_ == State::kPushed) {
+		return;
+	}
+	const Vector3 difference = position_ - other.position_;
+	const float distanceSquared = LengthSquared(difference);
+	const float radiusSum = radius_ + other.radius_;
+	if (distanceSquared >= radiusSum * radiusSum) {
+		return;
+	}
+	Vector3 normal{};
+	float penetration = 0.0f;
+	if (distanceSquared > 0.00000001f) {
+		const float distance = std::sqrt(distanceSquared);
+		normal = difference / distance;
+		penetration = radiusSum - distance;
+	}
+	else {
+		// 球の中心が重なっている場合は、適当に押し出す。
+		normal = {1.0f, 0.0f, 0.0f};
+		penetration = radiusSum;
+	}
+
+	const float inverseMass = state_ == State::kPushed ? 0.0f : 1.0f / GetMass();
+	const float otherInverseMass = other.state_ == State::kPushed ? 0.0f : 1.0f / other.GetMass();
+	const float inverseMassSum = inverseMass + otherInverseMass;
+	// 大きい玉ほど押し出されにくい。めり込み補正と衝突速度に同じ質量比を使う。
+	const float correction = (penetration + settings_.contactMargin) / inverseMassSum;
+	position_ += normal * (correction * inverseMass);
+	other.position_ -= normal * (correction * otherInverseMass);
+
+	const float relativeNormalSpeed = Dot(velocity_ - other.velocity_, normal);
+	if (-relativeNormalSpeed >= settings_.snowEffectMinSpeed) {
+		pendingEffectEvents_.push_back({EffectType::kSnowHit, position_ - normal * radius_, normal,
+		                                (std::max)(radius_, other.radius_), -relativeNormalSpeed});
+	}
+	if (relativeNormalSpeed < 0.0f) {
+		const float restitution = std::clamp((std::min)(settings_.snowRestitution, other.settings_.snowRestitution),
+		                                     0.0f, 1.0f);
+		const float impulse = -(1.0f + restitution) * relativeNormalSpeed / inverseMassSum;
+		velocity_ += normal * (impulse * inverseMass);
+		other.velocity_ -= normal * (impulse * otherInverseMass);
+		if (state_ == State::kStopped) {
+			state_ = State::kFree;
+		}
+		if (other.state_ == State::kStopped) {
+			other.state_ = State::kFree;
+		}
+	}
+
+	PrepareDraw();
+	other.PrepareDraw();
 }
 
 void Snow::Release() {
 	if (state_ == State::kPushed) {
 		state_ = State::kFree;
+		// Space中に得た速度と回転をそのまま引き継ぐ。
 	}
 }
 
-void Snow::UpdatePhysics(float deltaTime, MapChipField& map, const Vector3& playerPosition, float playerYaw,
+void Snow::UpdatePhysics(float deltaTime, MapChipField& map, const Vector3& playerPosition,
+                         const Vector3& playerVelocity,
                          float playerHalfWidth) {
 	if (deltaTime <= 0.0f) {
 		return;
 	}
-	PlayerToSnowCollsion(playerPosition, playerHalfWidth);
+	if (state_ == State::kPushed) {
+		return; // Space中はPlayer::Updateで配置・回転済み。自由物体として積分しない。
+	}
+	PlayerToSnowCollision(playerPosition, playerVelocity, playerHalfWidth);
+
 	if (state_ == State::kStopped) {
 		return;
 	}
@@ -154,35 +258,6 @@ void Snow::UpdatePhysics(float deltaTime, MapChipField& map, const Vector3& play
 	for (int step = 0; step < steps; ++step) {
 		const Vector3 previousPosition = position_;
 
-		if (state_ == State::kPushed) {
-			const Vector3 forward = {std::sin(playerYaw), 0.0f, std::cos(playerYaw)};
-			const Vector3 target = playerPosition + forward * (playerHalfWidth + radius_ + settings_.placementGap);
-
-			Vector3 error = target - position_;
-			error.y = 0.0f;
-
-			Vector3 desiredVelocity = error * settings_.pushGain;
-			const float desiredSpeed = Length(desiredVelocity);
-			if (desiredSpeed > settings_.maxPushSpeed) {
-				desiredVelocity *= settings_.maxPushSpeed / desiredSpeed;
-			}
-
-			const float radiusRatio = radius_ / settings_.initialRadius;
-			const float mass = settings_.baseMass * radiusRatio * radiusRatio * radiusRatio;
-
-			const Vector3 currentHorizontal = {velocity_.x, 0.0f, velocity_.z};
-			Vector3 acceleration = (desiredVelocity - currentHorizontal) * settings_.pushResponse;
-
-			const float accelerationLength = Length(acceleration);
-			const float maximumAcceleration = settings_.maxPushForce / mass;
-			if (accelerationLength > maximumAcceleration) {
-				acceleration *= maximumAcceleration / accelerationLength;
-			}
-
-			velocity_.x += acceleration.x * stepTime;
-			velocity_.z += acceleration.z * stepTime;
-		}
-
 		velocity_.y -= settings_.gravity * stepTime;
 		position_ += velocity_ * stepTime;
 
@@ -192,7 +267,10 @@ void Snow::UpdatePhysics(float deltaTime, MapChipField& map, const Vector3& play
 		if (grounded_) {
 			const float speed = std::sqrt(velocity_.x * velocity_.x + velocity_.z * velocity_.z);
 			const float damping = std::exp(-settings_.rollingResistance * stepTime);
-			const float slowed = (std::max)(0.0f, speed * damping - settings_.rollingDeceleration * stepTime);
+			const float massRatio = GetMass() / (std::max)(settings_.baseMass, 0.001f);
+			const float massLoad = 1.0f + ((std::max)(massRatio, 1.0f) - 1.0f) * settings_.rollingMassInfluence;
+			const float slowed = (
+				std::max)(0.0f, speed * damping - settings_.rollingDeceleration / massLoad * stepTime);
 			const float ratio = speed > 0.0f ? slowed / speed : 0.0f;
 
 			velocity_.x *= ratio;
@@ -202,8 +280,8 @@ void Snow::UpdatePhysics(float deltaTime, MapChipField& map, const Vector3& play
 
 		rotation_ += angularVelocity_ * stepTime;
 
-		// 押している間、衝突解決後に実際に転がった距離だけ成長する。
-		if (state_ == State::kPushed && grounded_) {
+		// 離した後も接地して実際に進んだ距離だけ成長する。
+		if (grounded_) {
 			const Vector3 moved = {position_.x - previousPosition.x, 0.0f, position_.z - previousPosition.z};
 			const float previousRadius = radius_;
 			radius_ = (std::min)(radius_ + Length(moved) * settings_.growthPerDistance, settings_.maxRadius);
@@ -211,6 +289,7 @@ void Snow::UpdatePhysics(float deltaTime, MapChipField& map, const Vector3& play
 			if (radius_ > previousRadius) {
 				position_.y += radius_ - previousRadius;
 				ResolveMap(map);
+				NotifyMaxSizeReached(previousRadius);
 			}
 		}
 
@@ -319,8 +398,7 @@ void Snow::ResolveMap(MapChipField& map) {
 			continue;
 		}
 
-		const float radiusRatio = radius_ / settings_.initialRadius;
-		const float mass = settings_.baseMass * radiusRatio * radiusRatio * radiusRatio;
+		const float mass = GetMass();
 		const bool floorContact = normal.y > 0.6f;
 		const float restitution = -normalSpeed >= settings_.bounceThreshold
 			                          ? (floorContact ? settings_.floorRestitution : settings_.wallRestitution)
