@@ -18,6 +18,8 @@ public:
 	void Update();
 	void Draw();
 
+	void CheckAllCollisions();
+
 private:
 	void GenerateBlocks();
 	std::unique_ptr<LightGroup> playerLightGroup_;
@@ -35,6 +37,7 @@ private:
 
 	CameraController* cameraController_;
 	Model* bossModel_ = nullptr;
+	Model* bossTailModel_ = nullptr;
 	Boss* boss_ = nullptr;
 	Camera camera_;
 	void InitializePlayerLighting();
