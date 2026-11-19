@@ -1,10 +1,10 @@
-﻿#include "Player.h"
+#include "Player.h"
 
 #include <algorithm>
 #include <cmath>
 #include "GameMath.h"
 #include "MapChipField.h"
-
+XINPUT_STATE Xstate;
 Player::Player() = default;
 Player::~Player() = default;
 
@@ -47,7 +47,7 @@ void Player::Initialize(Model* moder, Model* snowModel, const Camera* camera) {
 	// 色の初期化
 	color_.Initialize();
 	color_.SetColor({1.0f, 0.25f, 0.15f, 1.0f});
-
+	numberOfJoysticks = Input::GetInstance()->GetNumberOfJoysticks();
 	// 雪玉の初期化
 	snows_.clear();
 	snow_ = nullptr;
@@ -57,6 +57,7 @@ void Player::Update(float deltaTime) {
 	if (deltaTime <= 0.0f) {
 		return;
 	}
+	Input::GetInstance()->GetJoystickState(0, Xstate);
 	//==========================
 	// 入力処理
 	//==========================
@@ -68,17 +69,21 @@ void Player::Update(float deltaTime) {
 	// 移動処理
 	//=========================
 
-
-	if (input->PushKey(DIK_A) || input->PushKey(DIK_LEFT)) {
+	if (numberOfJoysticks > 0) {
+		direction.x = Xstate.Gamepad.sThumbLX / 32768.0f; // XZ平面の移動方向を決定する。左に移動する場合は、X軸方向に-1.0fを加算する。
+		direction.z += Xstate.Gamepad.sThumbLY / 32768.0f;
+	}
+	if ((input->PushKey(DIK_A) || input->PushKey(DIK_LEFT))) {
 		direction.x -= 1.0f; // XZ平面の移動方向を決定する。左に移動する場合は、X軸方向に-1.0fを加算する。
 	}
-	if (input->PushKey(DIK_D) || input->PushKey(DIK_RIGHT)) {
+
+	if ((input->PushKey(DIK_D) || input->PushKey(DIK_RIGHT))) {
 		direction.x += 1.0f; // XZ平面の移動方向を決定する。右に移動する場合は、X軸方向に+1.0fを加算する。
 	}
-	if (input->PushKey(DIK_W) || input->PushKey(DIK_UP)) {
+	if ((input->PushKey(DIK_W) || input->PushKey(DIK_UP))) {
 		direction.z += 1.0f; // XZ平面の移動方向を決定する。前に移動する場合は、Z軸方向に+1.0fを加算する。
 	}
-	if (input->PushKey(DIK_S) || input->PushKey(DIK_DOWN)) {
+	if ((input->PushKey(DIK_S) || input->PushKey(DIK_DOWN))) {
 		direction.z -= 1.0f; // XZ平面の移動方向を決定する。後ろに移動する場合は、Z軸方向に-1.0fを加算する。
 	}
 
@@ -117,12 +122,14 @@ void Player::Update(float deltaTime) {
 	const float load = snow_ != nullptr ? snow_->GetMass() * pushLoadFactor_ : 0.0f;
 	const float loadRatio = 1.0f / (1.0f + load);
 	const Vector3 targetVelocity = lengthSquared > 0.0f
-		? facing_ * (moveSpeed_ * loadRatio) : Vector3{};
+		                               ? facing_ * (moveSpeed_ * loadRatio)
+		                               : Vector3{};
 	Vector3 horizontal = {velocity_.x, 0.0f, velocity_.z};
 	const Vector3 velocityDifference = targetVelocity - horizontal;
 	const float differenceLength = Length(velocityDifference);
 	const float acceleration = lengthSquared > 0.0f
-		? moveAcceleration_ * loadRatio : moveDeceleration_;
+		                           ? moveAcceleration_ * loadRatio
+		                           : moveDeceleration_;
 	const float maxChange = acceleration * deltaTime;
 	if (differenceLength > 0.0f) {
 		horizontal += velocityDifference * ((std::min)(1.0f, maxChange / differenceLength));

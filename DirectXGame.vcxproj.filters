@@ -57,6 +57,12 @@
     <ClCompile Include="Effects.cpp">
       <Filter>ソースファイル</Filter>
     </ClCompile>
+    <ClCompile Include="HttpClient.cpp">
+      <Filter>ソースファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="HttpTask.cpp">
+      <Filter>ソースファイル</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Player.h">
@@ -84,6 +90,12 @@
       <Filter>ヘッダーファイル</Filter>
     </ClInclude>
     <ClInclude Include="Effects.h">
+      <Filter>ヘッダーファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="HttpClient.h">
+      <Filter>ヘッダーファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="HttpTask.h">
       <Filter>ヘッダーファイル</Filter>
     </ClInclude>
   </ItemGroup>

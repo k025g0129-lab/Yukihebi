@@ -1,10 +1,12 @@
-﻿#pragma once
+#pragma once
 
 #include <list>
 #include <vector>
 #include "Snow.h"
+#include "XInput.h"
 
 #include "MapCollider.h"
+
 class MapChipField;
 
 
@@ -71,4 +73,5 @@ private:
 	std::list<Snow> snows_; // プレイヤーが生成した雪玉のリスト。雪玉を置いた場合でも、snows_ の要素は消さない
 	// snows_ の要素があるかどうかを保持するフラグ。snows_ の要素がある場合は true、ない場合は false
 	bool snowsHave = false;
+	size_t numberOfJoysticks = 0; // 接続されているジョイスティックの数	
 };
