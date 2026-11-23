@@ -1,44 +1,23 @@
-#include "ClearScene.h"
+﻿#include "ClearScene.h"
 
 using namespace KamataEngine;
 
 void ClearScene::Initialize() {
-
-	// スペースキーが押されたら終了フラグを立てる
-	if (Input::GetInstance()->TriggerKey(DIK_SPACE)) {
-		clearScened_ = true;
-	}
-
-
-
-
-
+	clearScened_ = false;
 }
 
-ClearScene::~ClearScene() {
-
-
-
-}
-
+ClearScene::~ClearScene() = default;
 
 void ClearScene::Update() {
-
-
-
-
-
-
+	if (Input::GetInstance()->TriggerKey(DIK_RETURN)) {
+		clearScened_ = true;
+	}
 }
 
 void ClearScene::Draw() {
-
-
-
-
-
-
-
-
+	DebugText::GetInstance()->Print("BOSS DEFEATED - CLEAR!", 48.0f, 120.0f, 2.0f);
+	DebugText::GetInstance()->Print("PRESS ENTER FOR TITLE", 48.0f, 220.0f);
+	Sprite::PreDraw();
+	DebugText::GetInstance()->DrawAll();
+	Sprite::PostDraw();
 }
-

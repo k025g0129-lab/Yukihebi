@@ -1,10 +1,11 @@
-#include <Windows.h>
+﻿#include <Windows.h>
 #include <KamataEngine.h>
 
 #include "TitleScene.h"
 #include "TutorialScene.h"
 #include "GameScene.h"
 #include "ClearScene.h"
+#include "GameOverScene.h"
 
 using namespace KamataEngine;
 
@@ -16,6 +17,7 @@ TutorialScene* tutorialScene = nullptr;
 GameScene* gameScene = nullptr;
 //クリアシーンのインスタンス作成
 ClearScene* clearScene = nullptr;
+GameOverScene* gameOverScene = nullptr;
 
 enum class Scene {
 
@@ -25,6 +27,7 @@ enum class Scene {
 	kTuto,
 	kGame,
 	kClear,
+	kGameOver,
 
 };
 
@@ -39,6 +42,7 @@ void DrawScene();
 // Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	KamataEngine::Initialize(L"Top Down Player");
+	DebugText::GetInstance()->Initialize();
 	{
 		
 		//DirectXCommonインスタンスの取得
@@ -90,6 +94,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	//クリアシーンの解放
 	delete clearScene;
 	clearScene = nullptr;
+	delete gameOverScene;
+	gameOverScene = nullptr;
 
 	//チュートリアルの解放
 	delete tutorialScene;
@@ -147,9 +153,9 @@ void ChangeScene()
 			delete gameScene;
 			gameScene = nullptr;
 
-			scene = Scene::kTitle;
-			titleScene = new TitleScene();
-			titleScene->Initialize();
+				scene = Scene::kGameOver;
+				gameOverScene = new GameOverScene();
+				gameOverScene->Initialize();
 		
 		}
 
@@ -182,6 +188,23 @@ void ChangeScene()
 
 		break;
 
+		case Scene::kGameOver:
+			if (gameOverScene->IsRetryRequested() || gameOverScene->IsTitleRequested()) {
+				const bool retry = gameOverScene->IsRetryRequested();
+				delete gameOverScene;
+				gameOverScene = nullptr;
+				if (retry) {
+					scene = Scene::kGame;
+					gameScene = new GameScene();
+					gameScene->Initialize();
+				} else {
+					scene = Scene::kTitle;
+					titleScene = new TitleScene();
+					titleScene->Initialize();
+				}
+			}
+			break;
+
 	}
 
 }
@@ -204,6 +227,9 @@ void UpdateScene() {
 		case Scene::kClear:
 		    clearScene->Update();
 		    break;
+		case Scene::kGameOver:
+			gameOverScene->Update();
+			break;
 
 	}
 }
@@ -226,6 +252,9 @@ void DrawScene() {
 		case Scene::kClear:
 		    clearScene->Draw();
 		    break;
+		case Scene::kGameOver:
+			gameOverScene->Draw();
+			break;
 
 	}
 }

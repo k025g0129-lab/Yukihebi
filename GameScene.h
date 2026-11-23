@@ -31,6 +31,7 @@ public:
 	void Update();
 	void Draw();
 	void SetSnowEffectFeedbackSettings(const SnowEffectFeedbackSettings& settings);
+	void SetPlayerContactDamage(int headDamage, int tailDamage);
 
 
 	//デストラクタのgetter
@@ -63,6 +64,8 @@ private:
 	float snowPhysicsAccumulator_ = 0.0f;
 	float hitStopRemainingSeconds_ = 0.0f;
 	SnowEffectFeedbackSettings snowEffectFeedbackSettings_{};
+	int playerHeadContactDamage_ = 1;
+	int playerTailContactDamage_ = 1;
 	static constexpr float kSnowPhysicsStep = 1.0f / 120.0f;
 	float Timer = 0.0f;
 	CameraController* cameraController_;

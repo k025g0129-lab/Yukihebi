@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
@@ -187,6 +187,7 @@ xcopy "$(ProjectDir)..\External\KamataEngine\shaders" "$(ProjectDir)Resources\En
     <ClCompile Include="CameraController.cpp" />
     <ClCompile Include="Effects.cpp" />
     <ClCompile Include="GameMath.cpp" />
+	<ClCompile Include="GameOverScene.cpp" />
     <ClCompile Include="GameScene.cpp" />
     <ClCompile Include="HttpClient.cpp" />
     <ClCompile Include="HttpTask.cpp" />
@@ -205,6 +206,7 @@ xcopy "$(ProjectDir)..\External\KamataEngine\shaders" "$(ProjectDir)Resources\En
     <ClInclude Include="CameraController.h" />
     <ClInclude Include="Effects.h" />
     <ClInclude Include="GameMath.h" />
+	<ClInclude Include="GameOverScene.h" />
     <ClInclude Include="GameScene.h" />
     <ClInclude Include="HttpClient.h" />
     <ClInclude Include="HttpTask.h" />

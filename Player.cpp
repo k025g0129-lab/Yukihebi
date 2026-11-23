@@ -1,4 +1,4 @@
-#include "Player.h"
+﻿#include "Player.h"
 
 #include <algorithm>
 #include <cmath>
@@ -26,7 +26,8 @@ void Player::Initialize(Model* moder, Model* snowModel, const Camera* camera) {
 	worldTransform_.scale_ = {0.5f, 0.5f, 0.5f};
 
 	// 初期の位置を設定
-	worldTransform_.translation_ = {0.0f, 0.5f, 0.0f};
+	// BOSSの初期位置(原点)と重ならない位置から開始する。
+	worldTransform_.translation_ = spawnPosition_;
 
 	// 初期の回転を設定
 	worldTransform_.rotation_ = {0.0f, 0.0f, 0.0f};
@@ -37,6 +38,8 @@ void Player::Initialize(Model* moder, Model* snowModel, const Camera* camera) {
 	// SetMapChipField() で地形情報を設定するまで、衝突判定は行わない。
 	verticalSpeed_ = 0.0f;
 	velocity_ = {};
+	hp_ = maxHp_;
+	damageInvincibilityRemaining_ = 0.0f;
 
 	// worldTransform_ の行列を更新
 	worldTransform_.matWorld_ = MakeAffineMatrix(
@@ -55,6 +58,10 @@ void Player::Initialize(Model* moder, Model* snowModel, const Camera* camera) {
 
 void Player::Update(float deltaTime) {
 	if (deltaTime <= 0.0f) {
+		return;
+	}
+	damageInvincibilityRemaining_ = (std::max)(0.0f, damageInvincibilityRemaining_ - deltaTime);
+	if (IsDead()) {
 		return;
 	}
 	Input::GetInstance()->GetJoystickState(0, Xstate);
@@ -175,9 +182,6 @@ void Player::Update(float deltaTime) {
 		snow_->Initialize(worldTransform_.translation_);
 		snow_->UpdateHeld(worldTransform_.translation_, velocity_, worldTransform_.rotation_.y,
 		                  worldTransform_.scale_.x, MapChipField::kTopDownFloorTop, 0.0f, mapChipField_);
-		if (snows_.size() > static_cast<size_t>(20)) {
-			snows_.pop_front(); // snows_ の要素が20個を超えた場合は、最初の要素を削除する。
-		}
 	}
 
 	// Space中だけPlayerの正面へ押し続ける。離した後は雪玉自身の物理で転がる。
@@ -190,6 +194,25 @@ void Player::Update(float deltaTime) {
 		else {
 			snow_->Release();
 			snow_ = nullptr; // 置く。snows_の要素は消さない
+		}
+	}
+	// Eキーで、手から離れた最も近い雪玉を向いている方向へ蹴る。
+	if (input->TriggerKey(kickKey_) && snow_ == nullptr) {
+		Snow* nearest = nullptr;
+		float nearestDistanceSquared = 0.0f;
+		for (Snow& snow : snows_) {
+			const Vector3 offset = snow.GetPos() - worldTransform_.translation_;
+			const float horizontalDistanceSquared = offset.x * offset.x + offset.z * offset.z;
+			const float allowedDistance = GetCollisionRadius() + snow.GetRadius() + kickReach_;
+			if (std::abs(offset.y) <= allowedDistance &&
+			    horizontalDistanceSquared <= allowedDistance * allowedDistance &&
+			    (nearest == nullptr || horizontalDistanceSquared < nearestDistanceSquared)) {
+				nearest = &snow;
+				nearestDistanceSquared = horizontalDistanceSquared;
+			}
+		}
+		if (nearest != nullptr) {
+			nearest->Kick(facing_, kickSpeed_);
 		}
 	}
 
@@ -222,10 +245,13 @@ void Player::SetMapChipField(MapChipField* field) {
 }
 
 void Player::UpdateSnowPhysics(float deltaTime, MapChipField& map) {
-	for (Snow& snow : snows_) {
-		snow.UpdatePhysics(deltaTime, map, worldTransform_.translation_, velocity_,
+	for (auto it = snows_.begin(); it != snows_.end();) {
+		it->UpdatePhysics(deltaTime, map, worldTransform_.translation_, velocity_,
 		                   worldTransform_.scale_.x);
-		if (snow.GetWorldTransform().translation_.y < -5.0f) {
+		if (&*it != snow_ && it->GetPos().y < snowDespawnY_) {
+			it = snows_.erase(it);
+		} else {
+			++it;
 		}
 	}
 
@@ -236,6 +262,25 @@ void Player::UpdateSnowPhysics(float deltaTime, MapChipField& map) {
 			first->SnowToSnowCollision(*second);
 		}
 	}
+}
+
+bool Player::ApplyDamage(int damage) {
+	if (damage <= 0 || IsDead() || damageInvincibilityRemaining_ > 0.0f) {
+		return false;
+	}
+	hp_ = (std::max)(0, hp_ - damage);
+	damageInvincibilityRemaining_ = damageInvincibilitySeconds_;
+	return true;
+}
+
+std::list<Snow>::iterator Player::RemoveSnow(std::list<Snow>::iterator it) {
+	if (it == snows_.end()) {
+		return it;
+	}
+	if (&*it == snow_) {
+		snow_ = nullptr;
+	}
+	return snows_.erase(it);
 }
 
 void Player::DrainSnowEffectEvents(std::vector<Snow::EffectEvent>& events) {

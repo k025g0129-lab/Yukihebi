@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <KamataEngine.h>
 #include <memory>
 #include "GameMath.h"
@@ -48,10 +48,10 @@ public:
 	~Boss();
 
 	void Initialize(Model* model, Model* tailModel, const Camera* camera, Player* player);
-	void Update();
+	void Update(float deltaTime);
 	void Draw();
 
-	void FaceTowardPlayer(); 
+	void FaceTowardPlayer();
 	void TrackingWalkUpdate();
 	void DushMove();
 
@@ -59,7 +59,11 @@ public:
 	void RushUpdate();
 
 	//尻尾
-	void AddTail();
+	bool AddTail();
+	bool TryEatSnow();
+	bool IsDead() const { return hp_ <= 0; }
+	int GetHp() const { return hp_; }
+	int GetMaxHp() const { return kMaxHp; }
 
 
 	//セッター
@@ -67,13 +71,12 @@ public:
 	const Vector3 GetMouthPos();
 
 	std::size_t GetTailCount() const { return bossTails_.size(); }
-	const Vector3& GetTailPos(std::size_t index) const { return bossTails_[index]->GetPos(); }
+	Vector3 GetTailPos(std::size_t index) const { return bossTails_[index]->GetPos(); }
 	float GetMouthRadius() const { return kMouthRadius; }
 	float GetTailRadius() const { return kTailRadius; }
 
-	void IsCollisionMouthToSnow (Snow& snow);
-
 private:
+	void CheckSelfCollision();
 
 	//状態
 	Behavior behavior;
@@ -88,13 +91,21 @@ private:
 	Player* player_;
 
 	//ステータス
-	int hp = 5;
+	int hp_ = 5;
+	Vector3 velocity_{};
+	float selfCollisionAgeSeconds_ = 0.0f;
+	float selfHitCooldownRemaining_ = 0.0f;
 
-	//追従
+	static inline const int kMaxHp = 5;
+	static inline const float kMinSelfImpactSpeed = 1.0f;
+	static inline const float kDamagePerImpactSpeed = 0.5f;
+	static inline const float kSelfHitCooldownSeconds = 0.6f;
+	static inline const float kInitialSelfCollisionDelaySeconds = 1.5f;
+	static inline const std::size_t kIgnoredFrontSegments = 2;
+
+	// 既存の追跡・突進の値
 	static inline const float kMaxWalkSpeed = 0.03f;
 	static inline const float kMaxTurnAngle = 0.05f;
-
-	//突進
 	static inline const float kMaxFaceTowardChargeTime = 5.0f;
 	static inline const float kMaxRushChargeTime = 1.0f;
 	static inline const float kMaxRushTime = 3.0f;
@@ -106,7 +117,7 @@ private:
 	Model* tailModel_ = nullptr;
 	std::vector<std::unique_ptr<BossTail>> bossTails_;
 	BossTail* bossTail_;
-	static inline const int kDefaultMaxTail = 5;
+	static inline const int kDefaultMaxTail = 0;
 	static inline const int kMaxTail = 15;
 	static inline const int kTailInterval = 30;
 	static inline const int kMaxFootprint = kMaxTail * kTailInterval + 1;
