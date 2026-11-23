@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <list>
 #include <vector>
@@ -42,11 +42,24 @@ public:
 	void SetGravityPerFrame(float gravity) { gravity_ = gravity * 60.0f * 60.0f; } // 従来のフレーム単位の値を換算する
 	void SetSpaceRiseSpeed(float speed) { spaceRiseSpeed_ = speed; } // スペースキーで上昇する速度を設定する
 	void SetMaxFallSpeed(float speed) { maxFallSpeed_ = speed * 60.0f; } // 従来のフレーム単位の値を換算する
+	void SetMaxHp(int hp) { maxHp_ = hp > 0 ? hp : 1; hp_ = maxHp_; }
+	void SetDamageInvincibilitySeconds(float seconds) { damageInvincibilitySeconds_ = seconds > 0.0f ? seconds : 0.0f; }
+	void SetKickSpeed(float speed) { kickSpeed_ = speed > 0.0f ? speed : 0.0f; }
+	void SetKickReach(float reach) { kickReach_ = reach > 0.0f ? reach : 0.0f; }
+	void SetKickKey(BYTE key) { kickKey_ = key; }
+	void SetSnowDespawnY(float y) { snowDespawnY_ = y; }
+	void SetSpawnPosition(const Vector3& position) { spawnPosition_ = position; }
+	bool ApplyDamage(int damage);
 
 	Vector3 GetVector3() { return worldTransform_.translation_; };
 	const WorldTransform& GetWorldTransform() const { return worldTransform_; }
 	const Vector3& GetVelocity() const { return velocity_; }
+	int GetHp() const { return hp_; }
+	int GetMaxHp() const { return maxHp_; }
+	float GetCollisionRadius() const { return worldTransform_.scale_.x; }
+	bool IsDead() const { return hp_ <= 0; }
 	std::list<Snow>& GetSnows() { return snows_; };
+	std::list<Snow>::iterator RemoveSnow(std::list<Snow>::iterator it);
 
 private:
 	//==========================
@@ -71,7 +84,16 @@ private:
 	Vector3 facing_ = {0.0f, 0.0f, 1.0f}; // 最後に向いていた方向
 	Vector3 velocity_ = {}; // 毎秒のプレイヤー速度
 	Snow* snow_ = nullptr; // プレイヤーが持っている雪玉のポインタ。nullptr の場合は、雪玉を持っていない
-	std::list<Snow> snows_; // プレイヤーが生成した雪玉のリスト。雪玉を置いた場合でも、snows_ の要素は消さない
+	std::list<Snow> snows_; // 生成した雪玉。場外へ落ちた要素は物理更新時に取り除く
+	int maxHp_ = 5;
+	int hp_ = 5;
+	float damageInvincibilitySeconds_ = 0.75f;
+	float damageInvincibilityRemaining_ = 0.0f;
+	float kickSpeed_ = 8.0f;
+	float kickReach_ = 0.5f; // プレイヤーと雪玉の表面間の許容距離
+	BYTE kickKey_ = DIK_E;
+	float snowDespawnY_ = -5.0f;
+	Vector3 spawnPosition_ = {0.0f, 0.5f, -4.0f};
 	// snows_ の要素があるかどうかを保持するフラグ。snows_ の要素がある場合は true、ない場合は false
 	bool snowsHave = false;
 	size_t numberOfJoysticks = 0; // 接続されているジョイスティックの数	

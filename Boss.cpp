@@ -1,4 +1,4 @@
-#include "Boss.h"
+﻿#include "Boss.h"
 #include "Player.h"
 
 Boss::Boss() = default;
@@ -9,6 +9,10 @@ void Boss::Initialize(Model* model, Model* tailModel, const Camera* camera, Play
 
 	behavior = Behavior::kUnknown;
 	behaviorRequest = Behavior::kUnknown;
+	hp_ = kMaxHp;
+	velocity_ = {};
+	selfCollisionAgeSeconds_ = 0.0f;
+	selfHitCooldownRemaining_ = 0.0f;
 
 	camera_ = camera;
 	model_ = model;
@@ -37,7 +41,7 @@ void Boss::Initialize(Model* model, Model* tailModel, const Camera* camera, Play
 	tailModel_ = tailModel;
 
 	bossTails_.clear();
-	for (int i = 0; i < kDefaultMaxTail; i++) {
+	for (int i = 0; i < kDefaultMaxTail; ++i) {
 		AddTail();
 	}
 
@@ -45,11 +49,17 @@ void Boss::Initialize(Model* model, Model* tailModel, const Camera* camera, Play
 	mouth.SetColor(Vector4{1.0f, 0.0f, 0.0f, 1.0f});
 }
 
-void Boss::Update() {
+void Boss::Update(float deltaTime) {
+	if (deltaTime <= 0.0f || IsDead()) {
+		return;
+	}
+	const Vector3 previousPosition = worldTransform_.translation_;
+	selfCollisionAgeSeconds_ += deltaTime;
+	selfHitCooldownRemaining_ = (std::max)(0.0f, selfHitCooldownRemaining_ - deltaTime);
 
 	//動き
 	TrackingWalkUpdate();
-	//RushUpdate();
+	velocity_ = (worldTransform_.translation_ - previousPosition) / deltaTime;
 
 	//口
 	mouth.SetPos(GetMouthPos());
@@ -81,6 +91,7 @@ void Boss::Update() {
 
 	worldTransform_.matWorld_ = MakeAffineMatrix(worldTransform_.scale_, worldTransform_.rotation_, worldTransform_.translation_);
 	worldTransform_.TransferMatrix();
+	CheckSelfCollision();
 }
 
 void Boss::Draw() {
@@ -145,7 +156,7 @@ void Boss::RushUpdate() {
 
 		break;
 	case NotTowardCharge:
-		if (rushT >kMaxRushChargeTime) {
+		if (rushT > kMaxRushChargeTime) {
 			rushAttack = RushAttack::Rush;
 			rushT = 0.0f;
 		}
@@ -165,22 +176,56 @@ void Boss::RushUpdate() {
 	
 }
 
-void Boss::AddTail() {
+bool Boss::AddTail() {
 
 	if (bossTails_.size() >= kMaxTail) {
-		return;
+		return false;
 	
 	}
 
 	auto it = footprints_.begin();
 
-	int index = (int(bossTails_.size()) + 1) * 10;
+	int index = (int(bossTails_.size()) + 1) * kTailInterval;
 
 	std::advance(it, index);
 
 	bossTails_.push_back(std::make_unique<BossTail>());
 	bossTails_.back()->Initialize(tailModel_,camera_,it->pos);
+	return true;
+}
 
+bool Boss::TryEatSnow() {
+	return !IsDead() && AddTail();
+}
+
+void Boss::CheckSelfCollision() {
+	if (selfCollisionAgeSeconds_ < kInitialSelfCollisionDelaySeconds ||
+	    selfHitCooldownRemaining_ > 0.0f) {
+		return;
+	}
+	const Vector3 headPosition = worldTransform_.translation_;
+	const float headRadius = worldTransform_.scale_.x;
+	for (std::size_t index = kIgnoredFrontSegments; index < bossTails_.size(); ++index) {
+		const Vector3 offset = headPosition - bossTails_[index]->GetPos();
+		const float radiusSum = headRadius + kTailRadius;
+		const float distanceSquared = LengthSquared(offset);
+		if (distanceSquared > radiusSum * radiusSum) {
+			continue;
+		}
+		// 接触面へ向かう速度を使い、かすめた接触や離れている接触では傷つかない。
+		const float impactSpeed = distanceSquared > 0.000001f
+			? (std::max)(0.0f, -Dot(velocity_, offset / std::sqrt(distanceSquared)))
+			: Length(velocity_);
+		if (impactSpeed < kMinSelfImpactSpeed) {
+			continue;
+		}
+		const int damage = (std::max)(1, static_cast<int>(std::ceil(impactSpeed * kDamagePerImpactSpeed)));
+		hp_ = (std::max)(0, hp_ - damage);
+		// 当たった雪玉を含め、それより後ろの胴体を消す。
+		bossTails_.erase(bossTails_.begin() + static_cast<std::ptrdiff_t>(index), bossTails_.end());
+		selfHitCooldownRemaining_ = kSelfHitCooldownSeconds;
+		return;
+	}
 }
 
 const Vector3 Boss::GetMouthPos() { 
@@ -195,10 +240,3 @@ const Vector3 Boss::GetMouthPos() {
 	return re; 
 }
 
-void Boss::IsCollisionMouthToSnow(Snow& snow) {
-
-
-	(void)snow;
-	AddTail();
-
-}

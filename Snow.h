@@ -59,6 +59,7 @@ public:
 
 	void SetSettings(const Settings& settings) { settings_ = settings; }
 	void Release();
+	void Kick(const Vector3& direction, float speed);
 
 	//==========================
 	// コンストラクタ・デストラクタ
@@ -110,7 +111,6 @@ public:
 	/** 雪玉と雪玉の接触判定 */
 	void SnowToSnowCollision(Snow& other);
 
-	void BossMouthToSnowIsCollision();
 	
 private:
 	//==========================

@@ -1,6 +1,7 @@
-#include "GameScene.h"
+﻿#include "GameScene.h"
 
 #include <algorithm>
+#include <string>
 #include <vector>
 #include "Boss.h"
 #include  "CameraController.h"
@@ -192,14 +193,23 @@ void GameScene::Update() {
 	}
 	effects_->Update(deltaTime);
 	cameraController_->Update();
-	boss_->Update();
-	if (input->PushKey(DIK_C)) {
+	boss_->Update(deltaTime);
+	if (boss_->IsDead()) {
 		isClear_ = true;
+		return;
 	}
 
 
 	//当たり判定
 	CheckAllCollisions();
+	if (player_->IsDead()) {
+		finished_ = true;
+	}
+}
+
+void GameScene::SetPlayerContactDamage(int headDamage, int tailDamage) {
+	playerHeadContactDamage_ = (std::max)(0, headDamage);
+	playerTailContactDamage_ = (std::max)(0, tailDamage);
 }
 
 void GameScene::SetSnowEffectFeedbackSettings(const SnowEffectFeedbackSettings& settings) {
@@ -272,30 +282,45 @@ void GameScene::Draw() {
 	effects_->Draw(camera_);
 
 	Model::PostDraw();
+	DebugText::GetInstance()->Print(
+		"HP " + std::to_string(player_->GetHp()) + "/" + std::to_string(player_->GetMaxHp()), 16.0f, 16.0f);
+	DebugText::GetInstance()->Print(
+		"BOSS " + std::to_string(boss_->GetHp()) + "/" + std::to_string(boss_->GetMaxHp()), 16.0f, 64.0f);
+	DebugText::GetInstance()->Print("WASD MOVE  SPACE ROLL/RELEASE  E KICK", 16.0f, 40.0f);
+	Sprite::PreDraw();
+	DebugText::GetInstance()->DrawAll();
+	Sprite::PostDraw();
 }
 
 void GameScene::CheckAllCollisions() {
-
-	#pragma region 蛇の口と雪玉の当たり判定
-		{
-			for (Snow& snow : player_->GetSnows()) {
-			    const Vector3& snowPos = snow.GetPos();
-			    float snowRadius = snow.GetRadius();
-
-				if (snow.IsSizeMax()) {
-
-
-					if (IsCollisionBallToBall(snowPos,snowRadius,boss_->GetMouthPos(),boss_->GetMouthRadius())) {
-					    snow.BossMouthToSnowIsCollision();
-					    boss_->IsCollisionMouthToSnow(snow);
-
-					}		    
-				
-				}
-
+	// 頭または胴体との接触でダメージを与える。連続接触はPlayer側の無敵時間で抑える。
+	const Vector3 playerPosition = player_->GetWorldTransform().translation_;
+	const float playerRadius = player_->GetCollisionRadius();
+	const WorldTransform& bossTransform = boss_->GetWorldTransform();
+	if (IsCollisionBallToBall(playerPosition, playerRadius,
+	                          bossTransform.translation_, bossTransform.scale_.x)) {
+		player_->ApplyDamage(playerHeadContactDamage_);
+	} else {
+		for (std::size_t index = 0; index < boss_->GetTailCount(); ++index) {
+			if (IsCollisionBallToBall(playerPosition, playerRadius,
+			                          boss_->GetTailPos(index), boss_->GetTailRadius())) {
+				player_->ApplyDamage(playerTailContactDamage_);
+				break;
 			}
 		}
-	#pragma endregion
+	}
+
+	// 口に触れた最大サイズの雪玉だけを消費する。上限で胴体を増やせない場合は残す。
+	auto& snows = player_->GetSnows();
+	for (auto it = snows.begin(); it != snows.end();) {
+		if (it->IsSizeMax() &&
+		    IsCollisionBallToBall(it->GetPos(), it->GetRadius(), boss_->GetMouthPos(), boss_->GetMouthRadius()) &&
+		    boss_->TryEatSnow()) {
+			it = player_->RemoveSnow(it);
+		} else {
+			++it;
+		}
+	}
 
 
 

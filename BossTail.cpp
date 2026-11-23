@@ -1,4 +1,4 @@
-#include "BossTail.h"
+﻿#include "BossTail.h"
 
 void BossTail::Initialize(Model* model, const Camera* camera, const Vector3 pos) {
 
@@ -8,6 +8,7 @@ void BossTail::Initialize(Model* model, const Camera* camera, const Vector3 pos)
 	worldTransform_.translation_ = pos;
 	color_.Initialize();
 	color_.SetColor({1.0f, 1.0f, 1.0f, 1.0f});
+	Update(); // 追加したフレームから正しい位置に描画する。
 }
 
 void BossTail::Update() {

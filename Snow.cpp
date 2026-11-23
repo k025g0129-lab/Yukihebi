@@ -248,6 +248,20 @@ void Snow::Release() {
 	}
 }
 
+void Snow::Kick(const Vector3& direction, float speed) {
+	if (state_ == State::kPushed || speed <= 0.0f) {
+		return;
+	}
+	const Vector3 horizontal = {direction.x, 0.0f, direction.z};
+	if (LengthSquared(horizontal) <= 0.000001f) {
+		return;
+	}
+	velocity_ = Normalize(horizontal) * speed;
+	angularVelocity_ = Cross(Vector3{0.0f, 1.0f, 0.0f}, velocity_) / (std::max)(radius_, 0.001f);
+	state_ = State::kFree;
+	PrepareDraw();
+}
+
 void Snow::UpdatePhysics(float deltaTime, MapChipField& map, const Vector3& playerPosition,
                          const Vector3& playerVelocity,
                          float playerHalfWidth) {
