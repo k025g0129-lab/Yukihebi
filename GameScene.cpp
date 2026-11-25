@@ -61,8 +61,10 @@ namespace {
 	}
 
 	// 接点に一瞬だけ大きな光を置く。動かないので、ヒットストップ中も同じ場所で光る。
+	// size は立方体の1辺の半分。大きくすると光ではなく「白い箱」に見えるため、上限を付ける。
 	void SpawnFlash(Effects& effects, const Vector3& position, const Vector4& color, float size, float lifeTime) {
-		effects.Spawn({position, {}, color, size, lifeTime, 0.0f});
+		constexpr float kMaxFlashSize = 0.3f;
+		effects.Spawn({position, {}, color, (std::min)(size, kMaxFlashSize), lifeTime, 0.0f});
 	}
 
 	// 上から見て輪が広がる衝撃波。真上からのカメラで最も読み取りやすい形。
@@ -97,7 +99,7 @@ namespace {
 
 	// 爆散。撃破・死亡・尻尾が切れるときに使う。
 	void SpawnExplosion(Effects& effects, const Vector3& center, const Vector4& color, float scale) {
-		SpawnFlash(effects, center, {1.0f, 1.0f, 0.9f, 1.0f}, 0.5f * scale, 0.15f);
+		SpawnFlash(effects, center, {1.0f, 1.0f, 0.9f, 1.0f}, 0.12f * scale, 0.1f);
 		SpawnBurst(effects, {
 			.position = center, .color = color, .count = static_cast<int>(20.0f * scale),
 			.minSpeed = 3.0f * scale, .maxSpeed = 9.0f * scale, .minSize = 0.06f, .maxSize = 0.12f,
@@ -168,13 +170,13 @@ namespace {
 			}
 		}
 		// 完成を知らせる閃光と、足元に広がる金色の輪。
-		SpawnFlash(effects, event.position, {1.0f, 0.95f, 0.6f, 1.0f}, event.radius * 1.4f, 0.12f);
+		SpawnFlash(effects, event.position, {1.0f, 0.95f, 0.6f, 1.0f}, 0.05f + event.radius * 0.15f, 0.1f);
 		SpawnRing(effects, event.position, {1.0f, 0.88f, 0.35f, 1.0f}, 28, 7.0f, 0.06f, 0.4f, 5.0f);
 	}
 
 	void SpawnWallHitEffect(Effects& effects, const Snow::EffectEvent& event) {
 		const float power = std::clamp(event.impactSpeed / 6.0f, 0.0f, 1.0f);
-		SpawnFlash(effects, event.position, {0.9f, 0.97f, 1.0f, 1.0f}, 0.08f + event.radius * 0.3f * power, 0.1f);
+		SpawnFlash(effects, event.position, {0.9f, 0.97f, 1.0f, 1.0f}, 0.05f + event.radius * 0.12f * power, 0.08f);
 		// 壁からステージの内側へ雪を噴き出させる。
 		SpawnBurst(effects, {
 			.position = event.position, .normal = event.normal, .color = {0.75f, 0.92f, 1.0f, 1.0f},
@@ -186,7 +188,7 @@ namespace {
 
 	void SpawnKickEffect(Effects& effects, const Snow::EffectEvent& event) {
 		// 蹴った足元の閃光と、Player側へ跳ね返る雪の破片。
-		SpawnFlash(effects, event.position, {1.0f, 1.0f, 0.9f, 1.0f}, 0.12f + event.radius * 0.4f, 0.1f);
+		SpawnFlash(effects, event.position, {1.0f, 1.0f, 0.9f, 1.0f}, 0.06f + event.radius * 0.12f, 0.08f);
 		SpawnBurst(effects, {
 			.position = event.position, .normal = event.normal, .color = {0.9f, 0.97f, 1.0f, 1.0f},
 			.count = 20, .minSpeed = 2.0f, .maxSpeed = 6.0f, .minSize = 0.03f, .maxSize = 0.06f,
@@ -497,7 +499,7 @@ void GameScene::ProcessBossDamage(const Vector3& hitPosition) {
 	}
 	previousBossHp_ = boss_->GetHp();
 	// 当たった位置の閃光、全方向への火花、地面に広がる衝撃波。
-	SpawnFlash(*effects_, hitPosition, {1.0f, 1.0f, 1.0f, 1.0f}, 0.6f, 0.12f);
+	SpawnFlash(*effects_, hitPosition, {1.0f, 1.0f, 1.0f, 1.0f}, 0.2f, 0.1f);
 	SpawnBurst(*effects_, {
 		.position = hitPosition, .color = {1.0f, 0.45f, 0.25f, 1.0f}, .count = 40,
 		.minSpeed = 3.0f, .maxSpeed = 9.0f, .minSize = 0.06f, .maxSize = 0.12f,
@@ -712,7 +714,7 @@ void GameScene::CheckAllCollisions() {
 		if (atMouth && it->IsSizeMax() && boss_->TryEatSnow()) {
 			// 雪玉が口へ吸い込まれ、口で光り、増えた尻尾の位置で粒が弾ける。
 			SpawnImplode(*effects_, mouthPosition, {0.75f, 0.93f, 1.0f, 1.0f}, 28, snowRadius * 2.5f, 0.25f);
-			SpawnFlash(*effects_, mouthPosition, {1.0f, 0.9f, 0.5f, 1.0f}, 0.45f, 0.12f);
+			SpawnFlash(*effects_, mouthPosition, {1.0f, 0.9f, 0.5f, 1.0f}, 0.15f, 0.1f);
 			SpawnBossEffect(mouthPosition, Normalize(snowPosition - mouthPosition), snowRadius,
 			                {1.0f, 0.85f, 0.45f, 1.0f}, 16, 3.5f);
 			const Vector3 newTailPosition = boss_->GetTailPos(boss_->GetTailCount() - 1);
@@ -749,7 +751,7 @@ void GameScene::CheckAllCollisions() {
 		const Vector3 snowContactPosition = snowPosition - normal * snowRadius;
 		// 大きい雪玉ほど、粒の数・大きさ・速さを増やして盛大に砕く。
 		const float sizeRatio = std::clamp(snowRadius / (std::max)(it->GetMaxRadius(), 0.001f), 0.0f, 1.0f);
-		SpawnFlash(*effects_, snowContactPosition, {1.0f, 1.0f, 1.0f, 1.0f}, 0.15f + 0.4f * sizeRatio, 0.1f);
+		SpawnFlash(*effects_, snowContactPosition, {1.0f, 1.0f, 1.0f, 1.0f}, 0.06f + 0.12f * sizeRatio, 0.08f);
 		SpawnBossEffect(snowContactPosition, normal, snowRadius,
 		                {1.0f, 0.65f, 0.3f, 1.0f}, 10 + static_cast<int>(20.0f * sizeRatio), 2.5f + 4.0f * sizeRatio);
 		SpawnBurst(*effects_, {
