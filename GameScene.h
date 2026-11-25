@@ -1,9 +1,10 @@
-﻿#pragma once
+#pragma once
 #include <KamataEngine.h>
 #include <chrono>
 #include <memory>
 #include <vector>
 #include "MapChipField.h"
+
 #include "Snow.h"
 using namespace KamataEngine;
 
@@ -24,6 +25,7 @@ public:
 		float shakeDurationFrames = 8.0f;
 		float fullStrengthImpactSpeed = 6.0f;
 	};
+
 	struct BossFeedbackSettings {
 		float playerHitStopSeconds = 0.08f;
 		float snowBreakHitStopSeconds = 0.045f;
@@ -58,6 +60,10 @@ public:
 
 	void CheckAllCollisions();
 
+	float GetClearTime() const {
+		return clearTime;
+	}
+
 private:
 	const Input* input = Input::GetInstance();
 	void GenerateBlocks();
@@ -65,10 +71,11 @@ private:
 	bool UpdateHitStop(float deltaTime);
 	void RequestSnowEffectFeedback(const Snow::EffectEvent& event);
 	void RequestImpactFeedback(float stopSeconds, float shakeAmplitude, float impactSpeed, float fullStrengthSpeed);
-	void SpawnBossEffect(const Vector3& position, const Vector3& normal, float radius, const Vector4& color, int count, float speed);
+	void SpawnBossEffect(const Vector3& position, const Vector3& normal, float radius, const Vector4& color, int count,
+	                     float speed);
 	void ProcessBossDamage(float impactSpeed);
 	std::unique_ptr<LightGroup> playerLightGroup_;
-
+	float clearTime;
 	MapChipField mapChipField_{};
 	std::vector<std::vector<std::unique_ptr<WorldTransform>>> worldTransformBlocks_;
 	std::unique_ptr<Model> modelBlock_;

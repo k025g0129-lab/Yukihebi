@@ -118,7 +118,7 @@ GameScene::~GameScene() {
 void GameScene::Initialize() {
 	input = Input::GetInstance();
 	InitializePlayerLighting();
-
+	clearTime = 0.0f;
 
 	// CSV のマップチップからブロックを生成する。
 	mapChipField_.LoadMapChipCSV("Resources/floor.csv");
@@ -160,6 +160,7 @@ void GameScene::Initialize() {
 	movableArea.top = halfMapDepth;
 	cameraController_->SetMovableArea(movableArea);
 
+
 	cameraController_->Reset();
 	UpdateLighting();
 }
@@ -169,6 +170,7 @@ void GameScene::Update() {
 	const float elapsed = +std::chrono::duration<float>(now - previousTime_).count();
 	previousTime_ = now;
 	const float deltaTime = std::clamp(elapsed, 0.0f, 0.05f);
+	clearTime += deltaTime;
 	if (deltaTime <= 0.0f) {
 		return;
 	}
@@ -197,6 +199,7 @@ void GameScene::Update() {
 		}
 		break;
 	}
+
 	snowPhysicsAccumulator_ += deltaTime;
 	while (snowPhysicsAccumulator_ >= kSnowPhysicsStep) {
 		player_->UpdateSnowPhysics(kSnowPhysicsStep, mapChipField_);
@@ -368,6 +371,7 @@ void GameScene::Draw() {
 	DebugText::GetInstance()->Print(
 		"BOSS " + std::to_string(boss_->GetHp()) + "/" + std::to_string(boss_->GetMaxHp()), 16.0f, 64.0f);
 	DebugText::GetInstance()->Print("WASD MOVE  SPACE ROLL/RELEASE  E KICK", 16.0f, 40.0f);
+	DebugText::GetInstance()->Print("Time" + std::to_string(clearTime), 16.0f, 100.0f);
 	Sprite::PreDraw();
 	DebugText::GetInstance()->DrawAll();
 	Sprite::PostDraw();
