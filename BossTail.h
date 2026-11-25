@@ -25,7 +25,6 @@ public:
 
 private:
 
-	
 	// 基本変数設定
 	const Camera* camera_ = nullptr;
 	WorldTransform worldTransform_{};
