@@ -20,6 +20,7 @@
     <ClCompile Include="TitleScene.cpp" />
     <ClCompile Include="TutorialScene.cpp" />
     <ClCompile Include="Ranking.cpp" />
+    <ClCompile Include="Ease.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BossTail.h" />
@@ -40,5 +41,7 @@
     <ClInclude Include="TutorialScene.h" />
     <ClInclude Include="Boss.h" />
     <ClInclude Include="Ranking.h" />
+    <ClInclude Include="Boss.h" />
+    <ClInclude Include="Ease.h" />
   </ItemGroup>
 </Project>

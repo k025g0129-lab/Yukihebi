@@ -97,8 +97,8 @@ private:
 	void ApplyVisual();
 
 	//状態
-	Behavior behavior;
-	Behavior behaviorRequest;
+	Behavior behavior_;
+	Behavior behaviorRequest_;
 
 	//基本変数設定
 	const Camera* camera_ = nullptr;

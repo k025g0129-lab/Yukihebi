@@ -704,6 +704,7 @@ void GameScene::CheckAllCollisions() {
 
 	// 口を先に判定する。口以外の本体や尻尾に触れた雪玉はサイズに関わらず壊す。
 	auto& snows = player_->GetSnows();
+
 	for (auto it = snows.begin(); it != snows.end();) {
 		const Vector3 snowPosition = it->GetPos();
 		const float snowRadius = it->GetRadius();
@@ -773,6 +774,30 @@ void GameScene::CheckAllCollisions() {
 		                      bossFeedbackSettings_.fullStrengthSpeed);
 		it = player_->RemoveSnow(it);
 	}
+
+	//尻尾に雪玉が触れた場合尻尾を追加する
+	for (auto it = snows.begin(); it != snows.end();) {
+		bool isTouch = false;
+
+		for (auto tailIndex = 0; tailIndex < boss_->GetTailCount(); tailIndex++) {
+			if (it->IsSizeMax() &&
+				IsCollisionBallToBall(it->GetPos(), it->GetRadius(),boss_->GetTailPos(tailIndex),boss_->GetTailRadius()) &&
+					boss_->TryEatSnow()) {
+
+				isTouch = true;
+				
+			}
+		}
+
+		if (isTouch) {
+			it = player_->RemoveSnow(it);	
+		} else {
+			it++;
+		}
+
+	}
+
+
 }
 
 void GameScene::GenerateBlocks() {
