@@ -6,8 +6,11 @@
 #include <list>
 #include <memory>
 #include <vector>
+#include <cstddef>
+#include <algorithm>
+#include "Ease.h"
+#include <cstdlib>
 #include "GameMath.h"
-
 
 #include <cmath>
 #include "BossTail.h"
@@ -24,6 +27,7 @@ enum class Behavior {
 	kDeath,
 	kDamageReaction,
 	kRush,
+	kSweeping,
 	k,
 	kUnknown,
 };
@@ -32,6 +36,11 @@ enum RushAttack {
 	FaceTowardCharge,
 	NotTowardCharge,
 	Rush,
+};
+
+enum SweepingAttack {
+	FaceTowardFanCharge,
+	Attack,
 };
 
 struct Footprint {
@@ -49,12 +58,25 @@ public:
 	void Update(float deltaTime);
 	void Draw();
 
-	void FaceTowardPlayer();
-	void TrackingWalkUpdate();
-	void DushMove();
+	//ビヘイビア
+	void BehaviorRequest();
+	void BehaviorUpdate();
 
-	//ラッシュ
+	//追従
+	void FaceTowardPlayer();
+	void NotFaceTowardPlayer();
+	void TrackingWalkInitialize();
+	void TrackingWalkUpdate();
+
+	//突進
+	void RushInitialize();
 	void RushUpdate();
+
+	//薙ぎ払い
+	void SweepingInitialize(); 
+	void SweepingUpdate(); 
+	void TailsFanUpdate();
+	void SweepingAttackUpdate();
 
 	//尻尾
 	bool AddTail();
@@ -62,6 +84,8 @@ public:
 	bool IsDead() const { return hp_ <= 0; }
 	int GetHp() const { return hp_; }
 	int GetMaxHp() const { return kMaxHp; }
+	bool InsertTail(std::size_t index);
+	void TailsTrackingUpdate();
 
 	bool ApplyDamage(int damage) {
 		if (damage <= 0 || IsDead()) {
@@ -136,10 +160,20 @@ private:
 	static constexpr float kMaxTurnAngle = 0.05f;
 	static constexpr float kMaxFaceTowardChargeTime = 5.0f;
 	static constexpr float kMaxRushChargeTime = 1.0f;
+	static constexpr float kMaxTrackingWalkTime = 10.0f;
 	static constexpr float kMaxRushTime = 3.0f;
+
 	RushAttack rushAttack;
+	float trackingWalkT = 0.0f;
 	float rushT = 0.0f;
 
+	//薙ぎ払い
+	SweepingAttack sweepingAttack;
+	float sweepingT = 0.0f;
+	float kTailsFanAngle = - 3.14f / 16.0f;
+	static inline const float kMaxSweepingChargeTime = 2.0f;
+	static inline const float kMaxSweepingAttackTime = 2.0f;
+	float sweepingStartAngle = 0.0f;
 
 	//尻尾
 	Model* tailModel_ = nullptr;
@@ -152,6 +186,7 @@ private:
 	std::list<Footprint> footprints_;
 	static constexpr float kTailRadius = 0.5f;
 	static constexpr float kHeadBodyRadius = 0.75f;
+	static constexpr float tailInterval = kTailRadius * 2.0f;
 
 	//口
 	BossTail mouth;
