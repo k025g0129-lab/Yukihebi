@@ -126,7 +126,20 @@ void Player::Update(float deltaTime) {
 	}
 
 	// 雪玉が大きくなるほど、歩行の加速と最高速度に負荷が掛かる。
-	const float load = snow_ != nullptr ? snow_->GetMass() * pushLoadFactor_ : 0.0f;
+	float loadMass = snow_ != nullptr ? snow_->GetMass() : 0.0f;
+	if (snow_ == nullptr) {
+		// 放した雪玉を押す場合も、Space中と同じ質量負荷を適用する。
+		for (const Snow& snow : snows_) {
+			const Vector3 offset = snow.GetPos() - worldTransform_.translation_;
+			const float reach = GetCollisionRadius() + snow.GetRadius() + 0.05f;
+			if (!snow.IsHeld() && std::abs(offset.y) <= reach &&
+			    offset.x * offset.x + offset.z * offset.z <= reach * reach &&
+			    Dot(facing_, Vector3{offset.x, 0.0f, offset.z}) > 0.0f) {
+				loadMass = (std::max)(loadMass, snow.GetMass());
+			}
+		}
+	}
+	const float load = loadMass * pushLoadFactor_;
 	const float loadRatio = 1.0f / (1.0f + load);
 	const Vector3 targetVelocity = lengthSquared > 0.0f
 		                               ? facing_ * (moveSpeed_ * loadRatio)
@@ -154,12 +167,22 @@ void Player::Update(float deltaTime) {
 	velocity_.y = verticalSpeed_; // Y方向の移動量を加算する。重力処理で計算したY方向の速度を加算する。
 
 	// 床ブロックの上面・側面・下面との接触を MapCollider に解決させる。
+	const Vector3 previousPosition = worldTransform_.translation_;
 	const MapCollider::Result collision = mapCollider_.Check(worldTransform_.translation_, velocity_ * deltaTime);
 	// 接触判定を行う。接触判定の結果、移動量が修正される。
 	worldTransform_.translation_ += collision.movement; // 接触判定後の移動量を加算する
+	// マップの外周は見えない壁として扱い、反動で場外へ出ないようにする。
+	if (mapChipField_ != nullptr) {
+		const float halfWidth = mapChipField_->GetLoadedBlockHorizontal() * MapChipField::kBlockWindth * 0.5f;
+		const float halfDepth = mapChipField_->GetLoadedBlockVirtical() * MapChipField::kBlockHeight * 0.5f;
+		const float maxX = (std::max)(0.0f, halfWidth - GetCollisionRadius());
+		const float maxZ = (std::max)(0.0f, halfDepth - GetCollisionRadius());
+		worldTransform_.translation_.x = std::clamp(worldTransform_.translation_.x, -maxX, maxX);
+		worldTransform_.translation_.z = std::clamp(worldTransform_.translation_.z, -maxZ, maxZ);
+	}
 	// 壁で止まった方向の速度を残すと、解放した雪玉に架空の勢いが伝わる。
-	velocity_.x = collision.movement.x / deltaTime;
-	velocity_.z = collision.movement.z / deltaTime;
+	velocity_.x = (worldTransform_.translation_.x - previousPosition.x) / deltaTime;
+	velocity_.z = (worldTransform_.translation_.z - previousPosition.z) / deltaTime;
 	// 接触判定の結果、床に接している場合は、y方向の速度を0にする。
 	if ((collision.landing && verticalSpeed_ < 0.0f) ||
 		(collision.ceiling && verticalSpeed_ > 0.0f)) {
@@ -271,6 +294,16 @@ bool Player::ApplyDamage(int damage) {
 	hp_ = (std::max)(0, hp_ - damage);
 	damageInvincibilityRemaining_ = damageInvincibilitySeconds_;
 	return true;
+}
+
+void Player::ApplyKnockback(const Vector3& direction, float speed) {
+	const Vector3 horizontal{direction.x, 0.0f, direction.z};
+	if (speed <= 0.0f || LengthSquared(horizontal) <= 0.000001f) {
+		return;
+	}
+	const Vector3 impulse = Normalize(horizontal) * speed;
+	velocity_.x = impulse.x;
+	velocity_.z = impulse.z;
 }
 
 std::list<Snow>::iterator Player::RemoveSnow(std::list<Snow>::iterator it) {
