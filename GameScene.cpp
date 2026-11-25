@@ -312,6 +312,7 @@ void GameScene::CheckAllCollisions() {
 
 	// 口に触れた最大サイズの雪玉だけを消費する。上限で胴体を増やせない場合は残す。
 	auto& snows = player_->GetSnows();
+
 	for (auto it = snows.begin(); it != snows.end();) {
 		if (it->IsSizeMax() &&
 			IsCollisionBallToBall(it->GetPos(), it->GetRadius(), boss_->GetMouthPos(), boss_->GetMouthRadius()) &&
@@ -322,6 +323,30 @@ void GameScene::CheckAllCollisions() {
 			++it;
 		}
 	}
+
+	//尻尾に雪玉が触れた場合尻尾を追加する
+	for (auto it = snows.begin(); it != snows.end();) {
+		bool isTouch = false;
+
+		for (auto tailIndex = 0; tailIndex < boss_->GetTailCount(); tailIndex++) {
+			if (it->IsSizeMax() &&
+				IsCollisionBallToBall(it->GetPos(), it->GetRadius(),boss_->GetTailPos(tailIndex),boss_->GetTailRadius()) &&
+					boss_->TryEatSnow()) {
+
+				isTouch = true;
+				
+			}
+		}
+
+		if (isTouch) {
+			it = player_->RemoveSnow(it);	
+		} else {
+			it++;
+		}
+
+	}
+
+
 }
 
 void GameScene::GenerateBlocks() {

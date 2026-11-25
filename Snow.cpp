@@ -1,4 +1,4 @@
-﻿#include "Snow.h"
+#include "Snow.h"
 #include <algorithm>
 #include <cmath>
 #include "MapChipField.h"

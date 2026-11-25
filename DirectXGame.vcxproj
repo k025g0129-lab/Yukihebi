@@ -180,14 +180,13 @@ xcopy "$(ProjectDir)..\External\KamataEngine\shaders" "$(ProjectDir)Resources\En
   <ItemGroup>
     <ClCompile Include="Boss.cpp" />
     <ClCompile Include="BossTail.cpp" />
-
     <ClCompile Include="ClearScene.cpp" />
+    <ClCompile Include="Ease.cpp" />
     <ClCompile Include="Fade.cpp" />
-
     <ClCompile Include="CameraController.cpp" />
     <ClCompile Include="Effects.cpp" />
     <ClCompile Include="GameMath.cpp" />
-	<ClCompile Include="GameOverScene.cpp" />
+    <ClCompile Include="GameOverScene.cpp" />
     <ClCompile Include="GameScene.cpp" />
     <ClCompile Include="HttpClient.cpp" />
     <ClCompile Include="HttpTask.cpp" />
@@ -202,11 +201,12 @@ xcopy "$(ProjectDir)..\External\KamataEngine\shaders" "$(ProjectDir)Resources\En
   <ItemGroup>
     <ClInclude Include="BossTail.h" />
     <ClInclude Include="ClearScene.h" />
+    <ClInclude Include="Ease.h" />
     <ClInclude Include="Fade.h" />
     <ClInclude Include="CameraController.h" />
     <ClInclude Include="Effects.h" />
     <ClInclude Include="GameMath.h" />
-	<ClInclude Include="GameOverScene.h" />
+    <ClInclude Include="GameOverScene.h" />
     <ClInclude Include="GameScene.h" />
     <ClInclude Include="HttpClient.h" />
     <ClInclude Include="HttpTask.h" />
