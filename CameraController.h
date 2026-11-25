@@ -12,9 +12,10 @@ class CameraController {
 public:
 	struct MapImpactShakeSettings {
 		// 衝突速度はワールド単位/秒、振幅はワールド単位、時間はフレーム数。
-		float minImpactSpeed = 4.0f;
-		float amplitudePerSpeed = 0.015f;
-		float maxAmplitude = 0.3f;
+		// カメラは高さ約20から見下ろすため、画面上で分かるよう振幅を大きめにする。
+		float minImpactSpeed = 1.0f;
+		float amplitudePerSpeed = 0.05f;
+		float maxAmplitude = 0.4f;
 		float durationFrames = 10.0f;
 	};
 
@@ -41,6 +42,8 @@ public:
 
 	void RequestShake(float amplitude, float durationFrames);
 	void RequestImpactKick(const Vector3& surfaceNormal, float amplitude, float retention);
+	// カメラを一瞬だけ地面へ寄せる。retention は1フレームごとに残る割合。
+	void RequestZoomPunch(float amount, float retention);
 	void RequestMapImpactShake(float impactSpeed);
 	void SetMapImpactShakeSettings(const MapImpactShakeSettings& settings);
 	void SetPlayerVerticalFocusMargin(float verticalMargin);
@@ -78,6 +81,8 @@ private:
 	// マップの四辺から、画面全体が収まるカメラ中心の範囲を求める。
 	Vector3 ClampToMovableArea(const Vector3& position) const;
 	Vector3 Shake();
+	// 揺れ・反動・寄りをまとめて足した最終位置をカメラへ反映し、反動と寄りを減衰させる。
+	void ApplyCameraOffsets(const Vector3& basePosition);
 	Vector3 followPosition_{};
 	// ジャンプ中に小さな上下動を追わないための仮想の注視点。
 	float playerFocusY_ = 0.0f;
@@ -87,6 +92,8 @@ private:
 	float shakeRemainingFrames_ = 0.0f;
 	Vector3 impactKickOffset_{};
 	float impactKickRetention_ = 0.72f;
+	float zoomPunch_ = 0.0f;
+	float zoomPunchRetention_ = 0.85f;
 	MapImpactShakeSettings mapImpactShakeSettings_{};
 	// カメラ
 	Camera* camera_ = nullptr;

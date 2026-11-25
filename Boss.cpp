@@ -12,6 +12,11 @@ void Boss::Initialize(Model* model, Model* tailModel, const Camera* camera, Play
 	velocity_ = {};
 	selfCollisionAgeSeconds_ = 0.0f;
 	selfHitCooldownRemaining_ = 0.0f;
+	damageFlashRemaining_ = 0.0f;
+	pulseRemaining_ = 0.0f;
+	pulseDuration_ = 0.0f;
+	pulseAmount_ = 0.0f;
+	removedTailPositions_.clear();
 
 	camera_ = camera;
 	model_ = model;
@@ -22,7 +27,8 @@ void Boss::Initialize(Model* model, Model* tailModel, const Camera* camera, Play
 	                                             worldTransform_.translation_);
 	worldTransform_.TransferMatrix();
 	color_.Initialize();
-	color_.SetColor({1.0f, 0.25f, 0.15f, 1.0f});
+	// 通常時は元の見た目のまま。被ダメージ時だけ ApplyVisual で白くする。
+	color_.SetColor({1.0f, 1.0f, 1.0f, 1.0f});
 
 	player_ = player;
 
@@ -56,6 +62,8 @@ void Boss::Update(float deltaTime) {
 	const Vector3 previousPosition = worldTransform_.translation_;
 	selfCollisionAgeSeconds_ += deltaTime;
 	selfHitCooldownRemaining_ = (std::max)(0.0f, selfHitCooldownRemaining_ - deltaTime);
+	damageFlashRemaining_ = (std::max)(0.0f, damageFlashRemaining_ - deltaTime);
+	pulseRemaining_ = (std::max)(0.0f, pulseRemaining_ - deltaTime);
 
 	//動き
 	TrackingWalkUpdate();
@@ -88,15 +96,13 @@ void Boss::Update(float deltaTime) {
 		tail->Update();
 	}
 
-	worldTransform_.matWorld_ = MakeAffineMatrix(worldTransform_.scale_, worldTransform_.rotation_,
-	                                             worldTransform_.translation_);
-	worldTransform_.TransferMatrix();
+	ApplyVisual();
 	CheckSelfCollision();
 }
 
 void Boss::Draw() {
 	mouth.Draw();
-	model_->Draw(worldTransform_, *camera_);
+	model_->Draw(worldTransform_, *camera_, &color_);
 
 	for (std::unique_ptr<BossTail>& tail : bossTails_) {
 		tail->Draw();
@@ -208,11 +214,52 @@ void Boss::CheckSelfCollision() {
 		}
 		const int damage = (std::max)(1, static_cast<int>(std::ceil(impactSpeed * kDamagePerImpactSpeed)));
 		hp_ = (std::max)(0, hp_ - damage);
-		// 当たった雪玉を含め、それより後ろの胴体を消す。
+		// 当たった雪玉を含め、それより後ろの胴体を消す。消える位置は演出用に残す。
+		for (std::size_t removed = index; removed < bossTails_.size(); ++removed) {
+			removedTailPositions_.push_back(bossTails_[removed]->GetPos());
+		}
 		bossTails_.erase(bossTails_.begin() + static_cast<std::ptrdiff_t>(index), bossTails_.end());
 		selfHitCooldownRemaining_ = kSelfHitCooldownSeconds;
 		return;
 	}
+}
+
+void Boss::RequestDamageFlash() {
+	damageFlashRemaining_ = kDamageFlashSeconds;
+	ApplyVisual();
+}
+
+void Boss::RequestPulse(float amount, float seconds) {
+	if (amount <= 0.0f || seconds <= 0.0f) {
+		return;
+	}
+	pulseAmount_ = amount;
+	pulseDuration_ = seconds;
+	pulseRemaining_ = seconds;
+	ApplyVisual();
+}
+
+void Boss::DrainRemovedTailPositions(std::vector<Vector3>& positions) {
+	positions.insert(positions.end(), removedTailPositions_.begin(), removedTailPositions_.end());
+	removedTailPositions_.clear();
+}
+
+void Boss::ApplyVisual() {
+	const Vector4 color = damageFlashRemaining_ > 0.0f ? kFlashColor : Vector4{1.0f, 1.0f, 1.0f, 1.0f};
+	color_.SetColor(color);
+	for (std::unique_ptr<BossTail>& tail : bossTails_) {
+		tail->SetColor(color);
+	}
+
+	// 膨らみは見た目の行列だけに掛ける。scale_ は当たり判定の半径なので変えない。
+	float pulse = 1.0f;
+	if (pulseRemaining_ > 0.0f && pulseDuration_ > 0.0f) {
+		const float ratio = pulseRemaining_ / pulseDuration_;
+		pulse += pulseAmount_ * ratio * ratio;
+	}
+	worldTransform_.matWorld_ = MakeAffineMatrix(worldTransform_.scale_ * pulse, worldTransform_.rotation_,
+	                                             worldTransform_.translation_);
+	worldTransform_.TransferMatrix();
 }
 
 const Vector3 Boss::GetMouthPos() {

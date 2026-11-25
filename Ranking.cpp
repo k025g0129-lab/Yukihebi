@@ -7,6 +7,7 @@
 void Ranking::Initialize(const std::string& baseUrl, const std::string& gameId) {
 	baseUrl_ = baseUrl;
 	gameId_ = gameId;
+	values_.clear();
 	ranking_.clear();
 	top3_.clear();
 	activeStage_.clear();
@@ -24,6 +25,7 @@ std::string Ranking::MakeUrl(const std::string& stageId) const {
 void Ranking::Fetch(const std::string& stageId) {
 	if (stageId != activeStage_) {
 		activeStage_ = stageId;
+		values_.clear();
 		ranking_.clear();
 		top3_.clear();
 		failed_ = false;
@@ -32,16 +34,17 @@ void Ranking::Fetch(const std::string& stageId) {
 	StartPending();
 }
 
-void Ranking::Submit(const std::string& stageId, float shots) {
+void Ranking::Submit(const std::string& stageId, int value) {
 	if (stageId != activeStage_) {
 		activeStage_ = stageId;
+		values_.clear();
 		ranking_.clear();
 		top3_.clear();
 		failed_ = false;
 		pendingFetchStage_.clear();
 	}
 
-	pendingSubmissions_.push_back({stageId, shots});
+	pendingSubmissions_.push_back({stageId, value});
 	StartPending();
 }
 
@@ -50,7 +53,8 @@ void Ranking::StartPending() {
 	if (!pendingSubmissions_.empty()) {
 		const Submission& submission = pendingSubmissions_.front();
 		char body[32];
-		std::snprintf(body, sizeof(body), "{\"value\":%.1f}", submission.shots);
+		// 小数で送るとサーバーに400で弾かれるため、必ず整数で送る。
+		std::snprintf(body, sizeof(body), "{\"value\":%d}", submission.value);
 		if (task_.Post(MakeUrl(submission.stage), body)) {
 			requestStage_ = submission.stage;
 			requestKind_ = RequestKind::kPost;
@@ -68,8 +72,9 @@ void Ranking::StartPending() {
 }
 
 void Ranking::ApplyValues(const std::string& json) {
-	ranking_ = ParseValues(json);
-	std::sort(ranking_.begin(), ranking_.end());
+	values_ = ParseValues(json);
+	std::sort(values_.begin(), values_.end());
+	ranking_ = values_;
 	ranking_.erase(std::unique(ranking_.begin(), ranking_.end()), ranking_.end());
 	top3_.assign(ranking_.begin(), ranking_.begin() + (std::min)(ranking_.size(), size_t{3}));
 }
@@ -132,6 +137,42 @@ bool Ranking::Update() {
 	}
 	StartPending();
 	return updated;
+}
+
+int Ranking::Histogram::IndexOf(int value) const {
+	if (counts.empty()) {
+		return 0;
+	}
+	const int index = (value - minValue) / (std::max)(bucketWidth, 1);
+	return std::clamp(index, 0, static_cast<int>(counts.size()) - 1);
+}
+
+Ranking::Histogram Ranking::GetHistogram(int bucketCount) const {
+	Histogram histogram{};
+	if (values_.empty() || bucketCount <= 0) {
+		return histogram;
+	}
+	// values_は少ない順。上位90%に当たる記録までを等分し、それより遅い記録は最後の区間へ入れる。
+	const std::size_t cutoffIndex = (values_.size() * 9 + 9) / 10 - 1; // ceil(0.9 * N) - 1
+	const int minValue = values_.front();
+	const int cutoffValue = values_[cutoffIndex];
+	histogram.minValue = minValue;
+	// 全員同じ値でも幅0にならないよう、最低1にする。
+	histogram.bucketWidth = (std::max)(1, (cutoffValue - minValue + bucketCount) / bucketCount);
+	histogram.counts.assign(static_cast<std::size_t>(bucketCount), 0);
+	for (const int value : values_) {
+		++histogram.counts[static_cast<std::size_t>(histogram.IndexOf(value))];
+	}
+	return histogram;
+}
+
+float Ranking::GetTopPercent(int value) const {
+	// 自分より少ない記録の数。重複を含めて数える。
+	const auto firstNotLess = std::lower_bound(values_.begin(), values_.end(), value);
+	const int fasterCount = static_cast<int>(firstNotLess - values_.begin());
+	const bool includesSelf = firstNotLess != values_.end() && *firstNotLess == value;
+	const int total = static_cast<int>(values_.size()) + (includesSelf ? 0 : 1);
+	return 100.0f * static_cast<float>(fasterCount + 1) / static_cast<float>(total);
 }
 
 int Ranking::FindRank(int shots) const {

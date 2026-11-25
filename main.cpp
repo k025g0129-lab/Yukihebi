@@ -1,5 +1,6 @@
 #include <KamataEngine.h>
 #include <Windows.h>
+#include <cmath>
 
 #include "ClearScene.h"
 #include "GameOverScene.h"
@@ -30,7 +31,10 @@ enum class Scene {
 };
 
 Ranking ranking_{};
-;
+// ランキングの送り先。ゴルフのゲーム（"golf"）と記録が混ざらないよう、このゲーム用のIDにする。
+// 値はクリア時間のミリ秒。
+constexpr const char* kRankingGameId = "snowball";
+constexpr const char* kRankingStageId = "boss_clear_ms";
 //現在のシーン(型)
 auto scene = Scene::kUnknown;
 
@@ -52,12 +56,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		scene = Scene::kTitle;
 		titleScene = new TitleScene;
 		titleScene->Initialize();
-		ranking_.Initialize("https://ranking-api.k025g0019.workers.dev", "golf");
+		ranking_.Initialize("https://ranking-api.k025g0019.workers.dev", kRankingGameId);
+		// 起動時に先読みし、クリア画面に入る前から上位記録を表示できるようにする。
+		ranking_.Fetch(kRankingStageId);
 		//GameScene scene;
 		//scene.Initialize();
 
 
 		while (!Update()) {
+			// 通信の完了はどのシーンでも受け取る。ゲーム中だけ呼ぶと、
+			// クリア画面へ移った後に送信結果と再取得が処理されない。
+			ranking_.Update();
 			// titleScene->Update();
 			// シーン切り替え
 			ChangeScene();
@@ -138,8 +147,6 @@ void ChangeScene() {
 		break;
 
 	case Scene::kGame:
-		ranking_.Update();
-
 		//ゲームオーバー時
 		if (gameScene->IsFinished()) {
 			delete gameScene;
@@ -155,9 +162,10 @@ void ChangeScene() {
 			scene = Scene::kClear;
 			clearScene = new ClearScene();
 			ClearTime_ = gameScene->GetClearTime();
-			clearScene->Initialize(ClearTime_);
-			ranking_.Submit("None", ClearTime_);
-			ranking_.Update();
+			// サーバーは整数しか受け付けないので、ミリ秒に直して送る。少ないほど上位。
+			const int clearMilliseconds = static_cast<int>(std::lround(ClearTime_ * 1000.0f));
+			clearScene->Initialize(ClearTime_, &ranking_, clearMilliseconds);
+			ranking_.Submit(kRankingStageId, clearMilliseconds);
 
 			delete gameScene;
 			gameScene = nullptr;
