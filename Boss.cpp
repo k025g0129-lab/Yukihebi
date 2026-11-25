@@ -9,6 +9,7 @@ void Boss::Initialize(Model* model, Model* tailModel, const Camera* camera, Play
 
 	behavior_ = Behavior::kTrackingWalk;
 	behaviorRequest_ = Behavior::kUnknown;
+
 	hp_ = kMaxHp;
 	velocity_ = {};
 	selfCollisionAgeSeconds_ = 0.0f;
@@ -76,50 +77,76 @@ void Boss::Update(float deltaTime) {
 	//口
 	mouth.SetPos(GetMouthPos());
 	mouth.Update();
-	
 
-	worldTransform_.matWorld_ = MakeAffineMatrix(worldTransform_.scale_, worldTransform_.rotation_, worldTransform_.translation_);
-	worldTransform_.TransferMatrix();
-	CheckSelfCollision();
-}
-
-void Boss::Draw() {
-	
-	mouth.Draw();
-	model_->Draw(worldTransform_, *camera_); 
-	
-	for (std::unique_ptr<BossTail>&tail : bossTails_) {
-		tail->Draw();
-	
-	}
-
-	for (std::unique_ptr<BossTail>& tail : bossTails_) {
-		// kTailIntervalフレーム分、過去の足跡へ移動
-		std::advance(it, kTailInterval);
-		std::advance(it, kTailInterval);
-		// その足跡の位置に尻尾を配置
-		tail->SetPos(it->pos);
-
-		// 尻尾を更新
-		tail->Update();
-	}
 
 	ApplyVisual();
 	CheckSelfCollision();
 }
-	CheckSelfCollision();
+
 void Boss::Draw() {
 	mouth.Draw();
 	model_->Draw(worldTransform_, *camera_, &color_);
 
 	for (std::unique_ptr<BossTail>& tail : bossTails_) {
 		tail->Draw();
-		tail->Draw();
+	}
+}
+
+void Boss::BehaviorRequest() {
+
+	if (behaviorRequest_ != Behavior::kUnknown) {
+		behavior_ = behaviorRequest_;
+		
+		switch (behavior_) {
+		case Behavior::kTrackingWalk:
+			TrackingWalkInitialize();
+			break;
+		case Behavior::kDeath:
+			break;
+		case Behavior::kDamageReaction:
+			break;
+		case Behavior::kRush:
+			RushInitialize();
+			break;
+		case Behavior::kSweeping:
+			SweepingInitialize();
+			break;
+
+		default:
+			break;
+		}
+	
+		behaviorRequest_ = Behavior::kUnknown;
 	}
 
 }
 
+void Boss::BehaviorUpdate() {
+
+	switch (behavior_) {
+	case Behavior::kTrackingWalk:
+		TrackingWalkUpdate();
+		break;
+	case Behavior::kDeath:
+		break;
+	case Behavior::kDamageReaction:
+		break;
+	case Behavior::kRush:
+		RushUpdate();
+		break;
+	case Behavior::kSweeping:
+		SweepingUpdate();
+		break;
+
+	default:
+		break;
+	}
+
+
+}
+
 void Boss::FaceTowardPlayer() {
+
 	//顔をプレイヤーの方向に徐々に向けさせる
 
 	Vector3 playerPos = player_->GetVector3();
@@ -137,7 +164,9 @@ void Boss::FaceTowardPlayer() {
 	turnAngle = std::atan2(std::sinf(turnAngle), std::cosf(turnAngle));
 	turnAngle = std::clamp(turnAngle, -kMaxTurnAngle, kMaxTurnAngle);
 
+	worldTransform_.rotation_.y += turnAngle;
 }
+
 
 void Boss::NotFaceTowardPlayer() {
 
@@ -167,16 +196,17 @@ void Boss::NotFaceTowardPlayer() {
 void Boss::TrackingWalkInitialize() { 
 	trackingWalkT = 0.0f;
 
-	worldTransform_.rotation_.y += turnAngle;
-
 }
-	trackingWalkT += 1.0f/60.0f;
+
 void Boss::TrackingWalkUpdate() {
+	trackingWalkT += 1.0f/60.0f;
 
 	//顔の向きを徐々にプレイヤーに向ける
 	FaceTowardPlayer();
 
 	//その方向に移動
+	worldTransform_.translation_.x += std::sinf(worldTransform_.rotation_.y) * kMaxWalkSpeed;
+	worldTransform_.translation_.z += std::cosf(worldTransform_.rotation_.y) * kMaxWalkSpeed;
 
 	//尻尾
 	TailsTrackingUpdate();
@@ -191,10 +221,7 @@ void Boss::RushInitialize() {
 	rushT = 0; 
 	rushAttack = RushAttack::FaceTowardCharge;
 
-
-
 }
-
 void Boss::RushUpdate() {
 
 	//突撃内容を変える,以下は旧
@@ -230,9 +257,7 @@ void Boss::RushUpdate() {
 			behaviorRequest_ = Behavior::kTrackingWalk;
 		}
 		break;
-
 	}
-	
 }
 
 void Boss::SweepingInitialize() { 
@@ -254,6 +279,8 @@ void Boss::SweepingUpdate() {
 			sweepingT = 0.0f;
 			sweepingAttack = SweepingAttack::Attack;
 		}
+
+		break;
 	case Attack:
 		SweepingAttackUpdate();
 		break;
@@ -311,10 +338,10 @@ void Boss::TailsFanUpdate() {
 		targetPrevPos = pos;
 
 		toNextAngle += kTailsFanAngle;
-		break;
-	
 	}
-	
+
+
+
 }
 
 void Boss::SweepingAttackUpdate() {
@@ -415,20 +442,24 @@ void Boss::CheckSelfCollision() {
 			continue;
 		}
 
-			                          ? (std::max)(0.0f, -Dot(velocity_, offset / std::sqrt(distanceSquared)))
-			                          : Length(velocity_);
+		// 接触面へ向かう速度を使い、かすめた接触や離れている接触では傷つかない。
+		const float impactSpeed = distanceSquared > 0.000001f
+
 			? (std::max)(0.0f, -Dot(velocity_, offset / std::sqrt(distanceSquared)))
 			: Length(velocity_);
+
 		if (impactSpeed < kMinSelfImpactSpeed) {
 			continue;
 		}
+
+		const int damage = (std::max)(1, static_cast<int>(std::ceil(impactSpeed * kDamagePerImpactSpeed)));
+		hp_ = (std::max)(0, hp_ - damage);
 
 		// 当たった雪玉を含め、それより後ろの胴体を消す。消える位置は演出用に残す。
 		for (std::size_t removed = index; removed < bossTails_.size(); ++removed) {
 			removedTailPositions_.push_back(bossTails_[removed]->GetPos());
 		}
-		hp_ = (std::max)(0, hp_ - damage);
-		// 当たった雪玉を含め、それより後ろの胴体を消す。
+
 		bossTails_.erase(bossTails_.begin() + static_cast<std::ptrdiff_t>(index), bossTails_.end());
 		selfHitCooldownRemaining_ = kSelfHitCooldownSeconds;
 		return;

@@ -160,14 +160,9 @@ private:
 	static constexpr float kMaxTurnAngle = 0.05f;
 	static constexpr float kMaxFaceTowardChargeTime = 5.0f;
 	static constexpr float kMaxRushChargeTime = 1.0f;
+	static constexpr float kMaxTrackingWalkTime = 10.0f;
 	static constexpr float kMaxRushTime = 3.0f;
-	// 既存の追跡・突進の値
-	static inline const float kMaxWalkSpeed = 0.03f;
-	static inline const float kMaxTurnAngle = 0.05f;
-	static inline const float kMaxFaceTowardChargeTime = 5.0f;
-	static inline const float kMaxRushChargeTime = 1.0f;
-	static inline const float kMaxTrackingWalkTime = 10.0f;
-	static inline const float kMaxRushTime = 2.0f;
+
 	RushAttack rushAttack;
 	float trackingWalkT = 0.0f;
 	float rushT = 0.0f;
@@ -191,13 +186,7 @@ private:
 	std::list<Footprint> footprints_;
 	static constexpr float kTailRadius = 0.5f;
 	static constexpr float kHeadBodyRadius = 0.75f;
-	static inline const int kDefaultMaxTail = 10;
-	static inline const int kMaxTail = 15;
-	static inline const int kTailInterval = 30;
-	static inline const int kMaxFootprint = kMaxTail * kTailInterval + 1;
-	std::list < Footprint >footprints_; 
-	static inline const float kTailRadius = 0.5f;
-	static inline const float tailInterval = kTailRadius * 2.0f;
+	static constexpr float tailInterval = kTailRadius * 2.0f;
 
 	//口
 	BossTail mouth;
