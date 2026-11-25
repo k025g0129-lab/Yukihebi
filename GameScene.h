@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <KamataEngine.h>
 #include <chrono>
 #include <memory>

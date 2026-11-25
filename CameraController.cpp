@@ -1,4 +1,4 @@
-﻿#include "CameraController.h"
+#include "CameraController.h"
 
 #include <algorithm>
 #include <cmath>
@@ -12,7 +12,6 @@ void CameraController::Initialize() {
 	camera_->Initialize();
 	followPosition_ = camera_->translation_;
 	playerFocusY_ = followPosition_.y;
-	camera_->rotation_ = {1.3962634015955f, 0.0f, 0.0f};
 	movableArea_ = {
 		.left = -0.0f,
 		.top = 0.0f,

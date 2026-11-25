@@ -35,6 +35,7 @@ public:
 	Player* target_ = nullptr;
 	void SetTarget(Player* target) { target_ = target; }
 
+	void SetRotation_(const Vector3& rotation) { camera_->rotation_ = rotation; }
 
 	void Reset();
 

@@ -1,4 +1,4 @@
-﻿#include "GameScene.h"
+#include "GameScene.h"
 
 #include <algorithm>
 #include <string>
@@ -142,13 +142,13 @@ void GameScene::Initialize() {
 	bossModel_ = Model::CreateFromOBJ("Boss");
 	bossTailModel_ = Model::CreateFromOBJ("BossTail");
 	boss_ = new Boss();
-	boss_->Initialize(bossModel_, bossTailModel_, & camera_, player_);
+	boss_->Initialize(bossModel_, bossTailModel_, &camera_, player_);
 	cameraController_ = new CameraController();
 	cameraController_->SetCamera(&camera_);
 	cameraController_->Initialize();
 	cameraController_->SetTarget(player_);
 	cameraController_->targetOffset_ = {0.0f, 15.0f, -6.0f};
-
+	cameraController_->SetRotation_({1.3962634015955f, 0.0f, 0.0f});
 	CameraController::Rect movableArea{};
 	movableArea.left = -halfMapWidth;
 	movableArea.right = halfMapWidth;
@@ -158,7 +158,6 @@ void GameScene::Initialize() {
 
 	cameraController_->Reset();
 	UpdateLighting();
-
 }
 
 void GameScene::Update() {
@@ -300,7 +299,8 @@ void GameScene::CheckAllCollisions() {
 	if (IsCollisionBallToBall(playerPosition, playerRadius,
 	                          bossTransform.translation_, bossTransform.scale_.x)) {
 		player_->ApplyDamage(playerHeadContactDamage_);
-	} else {
+	}
+	else {
 		for (std::size_t index = 0; index < boss_->GetTailCount(); ++index) {
 			if (IsCollisionBallToBall(playerPosition, playerRadius,
 			                          boss_->GetTailPos(index), boss_->GetTailRadius())) {
@@ -314,17 +314,14 @@ void GameScene::CheckAllCollisions() {
 	auto& snows = player_->GetSnows();
 	for (auto it = snows.begin(); it != snows.end();) {
 		if (it->IsSizeMax() &&
-		    IsCollisionBallToBall(it->GetPos(), it->GetRadius(), boss_->GetMouthPos(), boss_->GetMouthRadius()) &&
-		    boss_->TryEatSnow()) {
+			IsCollisionBallToBall(it->GetPos(), it->GetRadius(), boss_->GetMouthPos(), boss_->GetMouthRadius()) &&
+			boss_->TryEatSnow()) {
 			it = player_->RemoveSnow(it);
-		} else {
+		}
+		else {
 			++it;
 		}
 	}
-
-
-
-
 }
 
 void GameScene::GenerateBlocks() {
