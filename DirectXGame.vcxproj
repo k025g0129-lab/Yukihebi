@@ -180,14 +180,12 @@ xcopy "$(ProjectDir)..\External\KamataEngine\shaders" "$(ProjectDir)Resources\En
   <ItemGroup>
     <ClCompile Include="Boss.cpp" />
     <ClCompile Include="BossTail.cpp" />
-
     <ClCompile Include="ClearScene.cpp" />
     <ClCompile Include="Fade.cpp" />
-
     <ClCompile Include="CameraController.cpp" />
     <ClCompile Include="Effects.cpp" />
     <ClCompile Include="GameMath.cpp" />
-	<ClCompile Include="GameOverScene.cpp" />
+    <ClCompile Include="GameOverScene.cpp" />
     <ClCompile Include="GameScene.cpp" />
     <ClCompile Include="HttpClient.cpp" />
     <ClCompile Include="HttpTask.cpp" />
@@ -195,6 +193,7 @@ xcopy "$(ProjectDir)..\External\KamataEngine\shaders" "$(ProjectDir)Resources\En
     <ClCompile Include="MapChipField.cpp" />
     <ClCompile Include="MapCollider.cpp" />
     <ClCompile Include="Player.cpp" />
+    <ClCompile Include="Ranking.cpp" />
     <ClCompile Include="Snow.cpp" />
     <ClCompile Include="TitleScene.cpp" />
     <ClCompile Include="TutorialScene.cpp" />
@@ -206,13 +205,14 @@ xcopy "$(ProjectDir)..\External\KamataEngine\shaders" "$(ProjectDir)Resources\En
     <ClInclude Include="CameraController.h" />
     <ClInclude Include="Effects.h" />
     <ClInclude Include="GameMath.h" />
-	<ClInclude Include="GameOverScene.h" />
+    <ClInclude Include="GameOverScene.h" />
     <ClInclude Include="GameScene.h" />
     <ClInclude Include="HttpClient.h" />
     <ClInclude Include="HttpTask.h" />
     <ClInclude Include="MapChipField.h" />
     <ClInclude Include="MapCollider.h" />
     <ClInclude Include="Player.h" />
+    <ClInclude Include="Ranking.h" />
     <ClInclude Include="Snow.h" />
     <ClInclude Include="TitleScene.h" />
     <ClInclude Include="TutorialScene.h" />
