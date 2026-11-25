@@ -35,6 +35,7 @@ void Snow::Initialize(const Vector3& position) {
 	angularVelocity_ = {};
 	squashNormal_ = {};
 	squashTimer_ = 0.0f;
+	pulseTimer_ = 0.0f;
 	grounded_ = false;
 	state_ = State::kPushed;
 	pendingEffectEvents_.clear();
@@ -73,7 +74,29 @@ void Snow::NotifyMaxSizeReached(float previousRadius) {
 	// 初めて上限に達した瞬間だけ通知する。上限に達した後の毎フレームは通知しない。
 	if (previousRadius < settings_.maxRadius && radius_ >= settings_.maxRadius) {
 		pendingEffectEvents_.push_back({EffectType::kMaxSize, position_, {0.0f, 1.0f, 0.0f}, radius_, 0.0f});
+		// 完成した瞬間に一瞬膨らませる。
+		pulseTimer_ = settings_.maxSizePulseTime;
 	}
+}
+
+void Snow::NotifyCreated() {
+	pendingEffectEvents_.push_back({EffectType::kCreate, position_, {0.0f, 1.0f, 0.0f}, radius_, 0.0f});
+}
+
+void Snow::NotifyWallHit(const Vector3& outward, float impactSpeed) {
+	// 押している間は壁沿いに滑らせるだけなので演出しない。
+	if (state_ == State::kPushed || impactSpeed < settings_.wallEffectMinSpeed) {
+		return;
+	}
+	// 接点は壁側の表面。法線はステージの内側へ向ける。
+	pendingEffectEvents_.push_back({EffectType::kWallHit, position_ + outward * radius_, -outward,
+	                                radius_, impactSpeed});
+	squashNormal_ = outward;
+	squashTimer_ = settings_.squashTime;
+}
+
+void Snow::UpdatePulse(float deltaTime) {
+	pulseTimer_ = (std::max)(0.0f, pulseTimer_ - deltaTime);
 }
 
 //===========================
@@ -117,6 +140,7 @@ void Snow::UpdateHeld(const Vector3& playerPosition, const Vector3& playerVeloci
 	}
 	angularVelocity_ = Cross(Vector3{0.0f, 1.0f, 0.0f}, velocity_) / (std::max)(radius_, 0.001f);
 	rotation_ += angularVelocity_ * deltaTime;
+	UpdatePulse(deltaTime);
 	PrepareDraw();
 }
 
@@ -260,9 +284,13 @@ void Snow::Kick(const Vector3& direction, float speed) {
 	if (LengthSquared(horizontal) <= 0.000001f) {
 		return;
 	}
-	velocity_ = Normalize(horizontal) * speed;
+	const Vector3 kickDirection = Normalize(horizontal);
+	velocity_ = kickDirection * speed;
 	angularVelocity_ = Cross(Vector3{0.0f, 1.0f, 0.0f}, velocity_) / (std::max)(radius_, 0.001f);
 	state_ = State::kFree;
+	// 蹴られた面（Player側）を接点とし、法線はPlayer側へ向ける。
+	pendingEffectEvents_.push_back({EffectType::kKick, position_ - kickDirection * radius_, -kickDirection,
+	                                radius_, speed});
 	PrepareDraw();
 }
 
@@ -275,9 +303,14 @@ void Snow::UpdatePhysics(float deltaTime, MapChipField& map, const Vector3& play
 	if (state_ == State::kPushed) {
 		return; // Space中はPlayer::Updateで配置・回転済み。自由物体として積分しない。
 	}
+	const bool pulsing = pulseTimer_ > 0.0f;
+	UpdatePulse(deltaTime);
 	PlayerToSnowCollision(playerPosition, playerVelocity, playerHalfWidth);
 
 	if (state_ == State::kStopped) {
+		if (pulsing) {
+			PrepareDraw(); // 止まっていても膨らみは戻す
+		}
 		return;
 	}
 	squashTimer_ = (std::max)(0.0f, squashTimer_ - deltaTime);
@@ -350,12 +383,18 @@ void Snow::ConstrainToStage(const MapChipField& map) {
 	const float x = std::clamp(position_.x, -maxX, maxX);
 	const float z = std::clamp(position_.z, -maxZ, maxZ);
 	if (x != position_.x) {
+		const float outward = position_.x > x ? 1.0f : -1.0f;
+		const float impactSpeed = velocity_.x * outward;
 		position_.x = x;
 		velocity_.x = 0.0f;
+		NotifyWallHit({outward, 0.0f, 0.0f}, impactSpeed);
 	}
 	if (z != position_.z) {
+		const float outward = position_.z > z ? 1.0f : -1.0f;
+		const float impactSpeed = velocity_.z * outward;
 		position_.z = z;
 		velocity_.z = 0.0f;
+		NotifyWallHit({0.0f, 0.0f, outward}, impactSpeed);
 	}
 }
 
@@ -504,10 +543,19 @@ void Snow::PrepareDraw() {
 		}
 	}
 
+	// 最大サイズ到達時の膨らみ。見た目だけ大きくし、判定の半径は変えない。
+	float pulse = 1.0f;
+	if (pulseTimer_ > 0.0f && settings_.maxSizePulseTime > 0.0f) {
+		const float ratio = pulseTimer_ / settings_.maxSizePulseTime;
+		pulse += settings_.maxSizePulseAmount * ratio * ratio;
+	}
+	const float drawRadius = radius_ * pulse;
+
 	worldTransform_.scale_ = {radius_, radius_, radius_};
 	worldTransform_.rotation_ = rotation_;
 	worldTransform_.translation_ = position_;
-	worldTransform_.matWorld_ = MakeAffineMatrix(worldTransform_.scale_, rotation_, {0, 0, 0}) * MakeScaleMatrix(squash)
+	worldTransform_.matWorld_ = MakeAffineMatrix({drawRadius, drawRadius, drawRadius}, rotation_, {0, 0, 0}) *
+		MakeScaleMatrix(squash)
 		* MakeTranslateMatrix(position_);
 	worldTransform_.TransferMatrix();
 }

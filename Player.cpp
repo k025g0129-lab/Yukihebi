@@ -172,14 +172,7 @@ void Player::Update(float deltaTime) {
 	// 接触判定を行う。接触判定の結果、移動量が修正される。
 	worldTransform_.translation_ += collision.movement; // 接触判定後の移動量を加算する
 	// マップの外周は見えない壁として扱い、反動で場外へ出ないようにする。
-	if (mapChipField_ != nullptr) {
-		const float halfWidth = mapChipField_->GetLoadedBlockHorizontal() * MapChipField::kBlockWindth * 0.5f;
-		const float halfDepth = mapChipField_->GetLoadedBlockVirtical() * MapChipField::kBlockHeight * 0.5f;
-		const float maxX = (std::max)(0.0f, halfWidth - GetCollisionRadius());
-		const float maxZ = (std::max)(0.0f, halfDepth - GetCollisionRadius());
-		worldTransform_.translation_.x = std::clamp(worldTransform_.translation_.x, -maxX, maxX);
-		worldTransform_.translation_.z = std::clamp(worldTransform_.translation_.z, -maxZ, maxZ);
-	}
+	ClampToStage();
 	// 壁で止まった方向の速度を残すと、解放した雪玉に架空の勢いが伝わる。
 	velocity_.x = (worldTransform_.translation_.x - previousPosition.x) / deltaTime;
 	velocity_.z = (worldTransform_.translation_.z - previousPosition.z) / deltaTime;
@@ -205,6 +198,8 @@ void Player::Update(float deltaTime) {
 		snow_->Initialize(worldTransform_.translation_);
 		snow_->UpdateHeld(worldTransform_.translation_, velocity_, worldTransform_.rotation_.y,
 		                  worldTransform_.scale_.x, MapChipField::kTopDownFloorTop, 0.0f, mapChipField_);
+		// 正面へ配置した後の位置で、生成の演出を通知する。
+		snow_->NotifyCreated();
 	}
 
 	// Space中だけPlayerの正面へ押し続ける。離した後は雪玉自身の物理で転がる。
@@ -240,18 +235,70 @@ void Player::Update(float deltaTime) {
 	}
 
 
-	//
 	// ワールド変換行列を更新
+	UpdateMatrix();
+}
+
+void Player::ClampToStage() {
+	if (mapChipField_ == nullptr) {
+		return;
+	}
+	const float halfWidth = mapChipField_->GetLoadedBlockHorizontal() * MapChipField::kBlockWindth * 0.5f;
+	const float halfDepth = mapChipField_->GetLoadedBlockVirtical() * MapChipField::kBlockHeight * 0.5f;
+	const float maxX = (std::max)(0.0f, halfWidth - GetCollisionRadius());
+	const float maxZ = (std::max)(0.0f, halfDepth - GetCollisionRadius());
+	worldTransform_.translation_.x = std::clamp(worldTransform_.translation_.x, -maxX, maxX);
+	worldTransform_.translation_.z = std::clamp(worldTransform_.translation_.z, -maxZ, maxZ);
+}
+
+void Player::UpdateMatrix() {
 	worldTransform_.matWorld_ = MakeAffineMatrix(
 		worldTransform_.scale_, worldTransform_.rotation_, worldTransform_.translation_);
 	worldTransform_.TransferMatrix(); // ワールド変換行列をシェーダに転送
+}
+
+bool Player::PushOutFromSphere(const Vector3& center, float radius) {
+	// 真上から見たゲームなので、高さの差は見ずに水平面だけで押し出す。
+	Vector3 offset = worldTransform_.translation_ - center;
+	offset.y = 0.0f;
+	const float minimumDistance = GetCollisionRadius() + radius;
+	const float distanceSquared = LengthSquared(offset);
+	if (distanceSquared >= minimumDistance * minimumDistance) {
+		return false;
+	}
+	float distance = std::sqrt(distanceSquared);
+	Vector3 normal{};
+	if (distance > 0.0001f) {
+		normal = offset / distance;
+	}
+	else {
+		// 中心が重なったときは、向いている方向の逆へ出す。
+		normal = {-facing_.x, 0.0f, -facing_.z};
+		distance = 0.0f;
+	}
+	worldTransform_.translation_ += normal * (minimumDistance - distance);
+	// 球へ向かう速度だけ消す。離れる向きの速度（ノックバック）は残す。
+	const float approachSpeed = Dot(velocity_, normal);
+	if (approachSpeed < 0.0f) {
+		velocity_ -= normal * approachSpeed;
+	}
+	ClampToStage();
+	UpdateMatrix();
+	return true;
 }
 
 void Player::Draw() {
 	//==========================
 	// 描画処理
 	//==========================
-	model_->Draw(worldTransform_, *camera_);
+	// 倒れた後は爆散の演出に任せて本体を消す。
+	// 被ダメージ後の無敵時間中は点滅させ、無敵であることを見せる。
+	constexpr float kBlinkInterval = 0.1f;
+	const bool blinkHidden = damageInvincibilityRemaining_ > 0.0f &&
+		std::fmod(damageInvincibilityRemaining_, kBlinkInterval) < kBlinkInterval * 0.5f;
+	if (!IsDead() && !blinkHidden) {
+		model_->Draw(worldTransform_, *camera_);
+	}
 	// snows_ の描画
 	for (Snow& snow : snows_) {
 		//==========================

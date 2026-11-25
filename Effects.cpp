@@ -1,5 +1,8 @@
 ﻿#include "Effects.h"
 
+#include <algorithm>
+#include <cmath>
+
 void Effects::Initialize() {
 	// 再初期化では描画リソースを作り直さず、粒の状態だけ消す。
 	if (!model_) {
@@ -31,7 +34,7 @@ bool Effects::Spawn(const ParticleDesc& desc) {
 			continue;
 		}
 		particle = {desc.position, desc.velocity, desc.color, desc.gravity,
-		            desc.size, desc.lifeTime, desc.lifeTime};
+		            desc.size, desc.lifeTime, desc.lifeTime, (std::max)(0.0f, desc.drag)};
 		return true;
 	}
 	return false;
@@ -49,13 +52,16 @@ void Effects::Update(float deltaTime) {
 			continue;
 		}
 		particle.velocity.y -= particle.gravity * deltaTime;
+		// 空気抵抗。出た瞬間に勢いよく弾け、すぐに減速して漂う動きにする。
+		particle.velocity *= std::exp(-particle.drag * deltaTime);
 		particle.position += particle.velocity * deltaTime;
 		if (drawCount_ >= kMaximumParticles) {
 			break;
 		}
 		// 残り寿命で小さく薄くする。加算合成なのでαを落とすと消えていく。
 		const float ratio = particle.life / particle.lifeTime;
-		const float size = particle.size * ratio;
+		// 大きさは ease-out で縮める。出た直後は大きさを保ち、最後に素早く消える。
+		const float size = particle.size * ratio * (2.0f - ratio);
 		WorldTransform& transform = transforms_[drawCount_];
 		transform.scale_ = {size, size, size};
 		transform.translation_ = particle.position;
