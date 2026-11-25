@@ -13,16 +13,23 @@ void Boss::Initialize(Model* model, Model* tailModel, const Camera* camera, Play
 	velocity_ = {};
 	selfCollisionAgeSeconds_ = 0.0f;
 	selfHitCooldownRemaining_ = 0.0f;
+	damageFlashRemaining_ = 0.0f;
+	pulseRemaining_ = 0.0f;
+	pulseDuration_ = 0.0f;
+	pulseAmount_ = 0.0f;
+	removedTailPositions_.clear();
 
 	camera_ = camera;
 	model_ = model;
 	worldTransform_.Initialize();
 	worldTransform_.scale_ = {0.5f, 0.5f, 0.5f};
 	worldTransform_.translation_ = {0.0f, 0.5f, 0.0f};
-	worldTransform_.matWorld_ = MakeAffineMatrix(worldTransform_.scale_, worldTransform_.rotation_, worldTransform_.translation_);
+	worldTransform_.matWorld_ = MakeAffineMatrix(worldTransform_.scale_, worldTransform_.rotation_,
+	                                             worldTransform_.translation_);
 	worldTransform_.TransferMatrix();
 	color_.Initialize();
-	color_.SetColor({1.0f, 0.25f, 0.15f, 1.0f});
+	// 通常時は元の見た目のまま。被ダメージ時だけ ApplyVisual で白くする。
+	color_.SetColor({1.0f, 1.0f, 1.0f, 1.0f});
 
 	player_ = player;
 
@@ -58,6 +65,8 @@ void Boss::Update(float deltaTime) {
 	const Vector3 previousPosition = worldTransform_.translation_;
 	selfCollisionAgeSeconds_ += deltaTime;
 	selfHitCooldownRemaining_ = (std::max)(0.0f, selfHitCooldownRemaining_ - deltaTime);
+	damageFlashRemaining_ = (std::max)(0.0f, damageFlashRemaining_ - deltaTime);
+	pulseRemaining_ = (std::max)(0.0f, pulseRemaining_ - deltaTime);
 
 	//動き
 	BehaviorRequest();
@@ -84,63 +93,33 @@ void Boss::Draw() {
 	
 	}
 
+	for (std::unique_ptr<BossTail>& tail : bossTails_) {
+		// kTailIntervalフレーム分、過去の足跡へ移動
+		std::advance(it, kTailInterval);
+		std::advance(it, kTailInterval);
+		// その足跡の位置に尻尾を配置
+		tail->SetPos(it->pos);
+
+		// 尻尾を更新
+		tail->Update();
+	}
+
+	ApplyVisual();
+	CheckSelfCollision();
 }
+	CheckSelfCollision();
+void Boss::Draw() {
+	mouth.Draw();
+	model_->Draw(worldTransform_, *camera_, &color_);
 
-void Boss::BehaviorRequest() {
-
-	if (behaviorRequest_ != Behavior::kUnknown) {
-		behavior_ = behaviorRequest_;
-		
-		switch (behavior_) {
-		case Behavior::kTrackingWalk:
-			TrackingWalkInitialize();
-			break;
-		case Behavior::kDeath:
-			break;
-		case Behavior::kDamageReaction:
-			break;
-		case Behavior::kRush:
-			RushInitialize();
-			break;
-		case Behavior::kSweeping:
-			SweepingInitialize();
-			break;
-
-		default:
-			break;
-		}
-	
-		behaviorRequest_ = Behavior::kUnknown;
+	for (std::unique_ptr<BossTail>& tail : bossTails_) {
+		tail->Draw();
+		tail->Draw();
 	}
 
 }
 
-void Boss::BehaviorUpdate() {
-
-	switch (behavior_) {
-	case Behavior::kTrackingWalk:
-		TrackingWalkUpdate();
-		break;
-	case Behavior::kDeath:
-		break;
-	case Behavior::kDamageReaction:
-		break;
-	case Behavior::kRush:
-		RushUpdate();
-		break;
-	case Behavior::kSweeping:
-		SweepingUpdate();
-		break;
-
-	default:
-		break;
-	}
-
-
-}
-
-void Boss::FaceTowardPlayer() { 
-
+void Boss::FaceTowardPlayer() {
 	//顔をプレイヤーの方向に徐々に向けさせる
 
 	Vector3 playerPos = player_->GetVector3();
@@ -149,17 +128,14 @@ void Boss::FaceTowardPlayer() {
 	float dx = playerPos.x - worldTransform_.translation_.x;
 	float dz = playerPos.z - worldTransform_.translation_.z;
 
-	if (dx * dx + dz * dz  <= 0.01f) {
-
+	if (dx * dx + dz * dz <= 0.01f) {
 		return;
 	}
 
 	float targetAngle = std::atan2(dx, dz);
-	turnAngle = targetAngle - worldTransform_.rotation_.y; 
+	turnAngle = targetAngle - worldTransform_.rotation_.y;
 	turnAngle = std::atan2(std::sinf(turnAngle), std::cosf(turnAngle));
 	turnAngle = std::clamp(turnAngle, -kMaxTurnAngle, kMaxTurnAngle);
-
-	worldTransform_.rotation_.y += turnAngle;
 
 }
 
@@ -191,16 +167,16 @@ void Boss::NotFaceTowardPlayer() {
 void Boss::TrackingWalkInitialize() { 
 	trackingWalkT = 0.0f;
 
-}
+	worldTransform_.rotation_.y += turnAngle;
 
-void Boss::TrackingWalkUpdate() {
+}
 	trackingWalkT += 1.0f/60.0f;
+void Boss::TrackingWalkUpdate() {
+
 	//顔の向きを徐々にプレイヤーに向ける
 	FaceTowardPlayer();
-	
+
 	//その方向に移動
-	worldTransform_.translation_.x += std::sinf(worldTransform_.rotation_.y) * kMaxWalkSpeed;
-	worldTransform_.translation_.z += std::cosf(worldTransform_.rotation_.y) * kMaxWalkSpeed;
 
 	//尻尾
 	TailsTrackingUpdate();
@@ -215,6 +191,8 @@ void Boss::RushInitialize() {
 	rushT = 0; 
 	rushAttack = RushAttack::FaceTowardCharge;
 
+
+
 }
 
 void Boss::RushUpdate() {
@@ -228,14 +206,14 @@ void Boss::RushUpdate() {
 		FaceTowardPlayer();
 
 		if (rushT > kMaxFaceTowardChargeTime) {
-			rushAttack = RushAttack::NotTowardCharge;
+			rushAttack = NotTowardCharge;
 			rushT = 0.0f;
 		}
 
 		break;
 	case NotTowardCharge:
 		if (rushT > kMaxRushChargeTime) {
-			rushAttack = RushAttack::Rush;
+			rushAttack = Rush;
 			rushT = 0.0f;
 		}
 		break;
@@ -247,7 +225,7 @@ void Boss::RushUpdate() {
 		TailsTrackingUpdate();
 
 		if (rushT > kMaxRushTime) {
-			rushAttack = RushAttack::FaceTowardCharge;
+			rushAttack = FaceTowardCharge;
 			rushT = 0.0f;
 			behaviorRequest_ = Behavior::kTrackingWalk;
 		}
@@ -276,8 +254,6 @@ void Boss::SweepingUpdate() {
 			sweepingT = 0.0f;
 			sweepingAttack = SweepingAttack::Attack;
 		}
-
-		break;
 	case Attack:
 		SweepingAttackUpdate();
 		break;
@@ -335,10 +311,10 @@ void Boss::TailsFanUpdate() {
 		targetPrevPos = pos;
 
 		toNextAngle += kTailsFanAngle;
+		break;
+	
 	}
-
-
-
+	
 }
 
 void Boss::SweepingAttackUpdate() {
@@ -373,20 +349,18 @@ void Boss::SweepingAttackUpdate() {
 }
 
 bool Boss::AddTail() {
-
 	if (bossTails_.size() >= kMaxTail) {
 		return false;
-	
 	}
 
 	auto it = footprints_.begin();
 
-	int index = (int(bossTails_.size()) + 1) * kTailInterval;
+	int index = (static_cast<int>(bossTails_.size()) + 1) * kTailInterval;
 
 	std::advance(it, index);
 
 	bossTails_.push_back(std::make_unique<BossTail>());
-	bossTails_.back()->Initialize(tailModel_,camera_,it->pos);
+	bossTails_.back()->Initialize(tailModel_, camera_, it->pos);
 	return true;
 }
 
@@ -425,7 +399,7 @@ void Boss::TailsTrackingUpdate() {
 void Boss::CheckSelfCollision() {
 
 	if (selfCollisionAgeSeconds_ < kInitialSelfCollisionDelaySeconds ||
-	    selfHitCooldownRemaining_ > 0.0f) {
+		selfHitCooldownRemaining_ > 0.0f) {
 		return;
 	}
 
@@ -441,18 +415,19 @@ void Boss::CheckSelfCollision() {
 			continue;
 		}
 
-		// 接触面へ向かう速度を使い、かすめた接触や離れている接触では傷つかない。
-		const float impactSpeed = distanceSquared > 0.000001f
+			                          ? (std::max)(0.0f, -Dot(velocity_, offset / std::sqrt(distanceSquared)))
+			                          : Length(velocity_);
 			? (std::max)(0.0f, -Dot(velocity_, offset / std::sqrt(distanceSquared)))
 			: Length(velocity_);
-
 		if (impactSpeed < kMinSelfImpactSpeed) {
 			continue;
 		}
 
-		const int damage = (std::max)(1, static_cast<int>(std::ceil(impactSpeed * kDamagePerImpactSpeed)));
+		// 当たった雪玉を含め、それより後ろの胴体を消す。消える位置は演出用に残す。
+		for (std::size_t removed = index; removed < bossTails_.size(); ++removed) {
+			removedTailPositions_.push_back(bossTails_[removed]->GetPos());
+		}
 		hp_ = (std::max)(0, hp_ - damage);
-
 		// 当たった雪玉を含め、それより後ろの胴体を消す。
 		bossTails_.erase(bossTails_.begin() + static_cast<std::ptrdiff_t>(index), bossTails_.end());
 		selfHitCooldownRemaining_ = kSelfHitCooldownSeconds;
@@ -460,15 +435,51 @@ void Boss::CheckSelfCollision() {
 	}
 }
 
-const Vector3 Boss::GetMouthPos() { 
+void Boss::RequestDamageFlash() {
+	damageFlashRemaining_ = kDamageFlashSeconds;
+	ApplyVisual();
+}
+
+void Boss::RequestPulse(float amount, float seconds) {
+	if (amount <= 0.0f || seconds <= 0.0f) {
+		return;
+	}
+	pulseAmount_ = amount;
+	pulseDuration_ = seconds;
+	pulseRemaining_ = seconds;
+	ApplyVisual();
+}
+
+void Boss::DrainRemovedTailPositions(std::vector<Vector3>& positions) {
+	positions.insert(positions.end(), removedTailPositions_.begin(), removedTailPositions_.end());
+	removedTailPositions_.clear();
+}
+
+void Boss::ApplyVisual() {
+	const Vector4 color = damageFlashRemaining_ > 0.0f ? kFlashColor : Vector4{1.0f, 1.0f, 1.0f, 1.0f};
+	color_.SetColor(color);
+	for (std::unique_ptr<BossTail>& tail : bossTails_) {
+		tail->SetColor(color);
+	}
+
+	// 膨らみは見た目の行列だけに掛ける。scale_ は当たり判定の半径なので変えない。
+	float pulse = 1.0f;
+	if (pulseRemaining_ > 0.0f && pulseDuration_ > 0.0f) {
+		const float ratio = pulseRemaining_ / pulseDuration_;
+		pulse += pulseAmount_ * ratio * ratio;
+	}
+	worldTransform_.matWorld_ = MakeAffineMatrix(worldTransform_.scale_ * pulse, worldTransform_.rotation_,
+	                                             worldTransform_.translation_);
+	worldTransform_.TransferMatrix();
+}
+
+const Vector3 Boss::GetMouthPos() {
 	Vector3 re = worldTransform_.translation_;
 	float angle = worldTransform_.rotation_.y;
 
 	re.x += std::sinf(angle) * kMouthRange;
 	re.z += std::cosf(angle) * kMouthRange;
 
-	
-	
-	return re; 
-}
 
+	return re;
+}

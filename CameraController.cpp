@@ -41,22 +41,25 @@ void CameraController::Update() {
 	followPosition_.y = std::clamp(followPosition_.y, targetPosition_.y + margin.bottom,
 	                               targetPosition_.y + margin.top);
 
+	ApplyCameraOffsets(followPosition_);
+}
+
+void CameraController::UpdateShakeOnly(const Vector3& basePosition) {
+	ApplyCameraOffsets(basePosition);
+}
+
+void CameraController::ApplyCameraOffsets(const Vector3& basePosition) {
+	// 寄りは高さだけを下げる。下げた高さで範囲制限するので、画面端はマップの外へ出ない。
+	const Vector3 zoomOffset{0.0f, -zoomPunch_, 0.0f};
 	// 反動と揺れも含めた最終位置を制限し、画面端がマップの外へ出ないようにする。
-	camera_->translation_ = ClampToMovableArea(followPosition_ + impactKickOffset_ + Shake());
+	camera_->translation_ = ClampToMovableArea(basePosition + impactKickOffset_ + zoomOffset + Shake());
 	impactKickOffset_ *= impactKickRetention_;
 	if (LengthSquared(impactKickOffset_) < 0.0001f) {
 		impactKickOffset_ = {};
 	}
-
-	camera_->UpdateMatrix();
-	camera_->TransferMatrix();
-}
-
-void CameraController::UpdateShakeOnly(const Vector3& basePosition) {
-	camera_->translation_ = ClampToMovableArea(basePosition + impactKickOffset_ + Shake());
-	impactKickOffset_ *= impactKickRetention_;
-	if (LengthSquared(impactKickOffset_) < 0.0001f) {
-		impactKickOffset_ = {};
+	zoomPunch_ *= zoomPunchRetention_;
+	if (zoomPunch_ < 0.01f) {
+		zoomPunch_ = 0.0f;
 	}
 	camera_->UpdateMatrix();
 	camera_->TransferMatrix();
@@ -77,6 +80,7 @@ void CameraController::Reset() {
 	shakeDurationFrames_ = 0.0f;
 	shakeRemainingFrames_ = 0.0f;
 	impactKickOffset_ = {};
+	zoomPunch_ = 0.0f;
 	camera_->UpdateMatrix();
 
 	camera_->TransferMatrix();
@@ -118,9 +122,8 @@ void CameraController::RequestShake(float amplitude, float durationFrames) {
 	if (amplitude <= 0.0f || durationFrames <= 0.0f) {
 		return;
 	}
-	const float currentAmplitude = shakeDurationFrames_ > 0.0f
-		                               ? shakeAmplitude_ * shakeRemainingFrames_ / shakeDurationFrames_
-		                               : 0.0f;
+	const float remainingRatio = shakeDurationFrames_ > 0.0f ? shakeRemainingFrames_ / shakeDurationFrames_ : 0.0f;
+	const float currentAmplitude = shakeAmplitude_ * remainingRatio * remainingRatio;
 	if (amplitude < currentAmplitude) {
 		return;
 	}
@@ -135,19 +138,33 @@ Vector3 CameraController::Shake() {
 	}
 
 	// 上から見た画面の横と縦に相当するX/Z方向を揺らす。
-	const float strength = shakeAmplitude_ * shakeRemainingFrames_ / shakeDurationFrames_;
+	// 2乗で減衰させ、最初の一発を強く、余韻を短くする。
+	const float remainingRatio = shakeRemainingFrames_ / shakeDurationFrames_;
+	const float strength = shakeAmplitude_ * remainingRatio * remainingRatio;
 	shakeRemainingFrames_ = (std::max)(0.0f, shakeRemainingFrames_ - 1.0f);
 	return {Random::Float(-strength, strength), 0.0f, Random::Float(-strength, strength)};
 }
 
 void CameraController::RequestImpactKick(
 	const Vector3& surfaceNormal, float amplitude, float retention) {
-	const Vector3 planarNormal{surfaceNormal.x, surfaceNormal.y, 0.0f};
+	// 真上から見下ろすカメラなので、画面の縦横に当たるX/Z平面で反動を付ける。
+	const Vector3 planarNormal{surfaceNormal.x, 0.0f, surfaceNormal.z};
 	if (LengthSquared(planarNormal) <= 0.0001f || amplitude <= 0.0f) {
 		return;
 	}
 	impactKickOffset_ = -Normalize(planarNormal) * amplitude;
 	impactKickRetention_ = std::clamp(retention, 0.0f, 0.99f);
+}
+
+void CameraController::RequestZoomPunch(float amount, float retention) {
+	if (amount <= 0.0f) {
+		return;
+	}
+	// 強い方を優先する。弱い寄りで強い寄りを打ち消さない。
+	if (amount >= zoomPunch_) {
+		zoomPunch_ = amount;
+		zoomPunchRetention_ = std::clamp(retention, 0.0f, 0.99f);
+	}
 }
 
 void CameraController::SetMapImpactShakeSettings(const MapImpactShakeSettings& settings) {

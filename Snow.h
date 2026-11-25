@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <KamataEngine.h>
 #include <vector>
 #include "GameMath.h"
@@ -15,7 +15,7 @@ public:
 
 	struct Settings {
 		float initialRadius = 0.2f;
-		float maxRadius = 1.0f;
+		float maxRadius = 0.7f;
 		float growthPerDistance = 0.25f;
 		float placementGap = 0.05f;
 
@@ -45,10 +45,14 @@ public:
 		float snowRestitution = 0.25f; // 雪玉同士の反発
 		float playerEffectMinSpeed = 0.35f; // Playerへの接近速度がこれ以上なら粒を出す
 		float snowEffectMinSpeed = 0.35f; // 雪玉同士の接近速度がこれ以上なら粒を出す
+		float wallEffectMinSpeed = 1.0f; // ステージ外周への衝突速度がこれ以上なら粒を出す
+		float maxSizePulseAmount = 0.3f; // 最大サイズ到達時に一瞬膨らむ割合
+		float maxSizePulseTime = 0.25f; // 膨らみが戻るまでの秒数
 	};
 
 	// 判定側は発生事実だけを通知し、粒の色や数はGameSceneで決める。
-	enum class EffectType { kPlayerHit, kSnowHit, kMaxSize };
+	enum class EffectType { kPlayerHit, kSnowHit, kMaxSize, kWallHit, kKick, kCreate };
+
 	struct EffectEvent {
 		EffectType type;
 		Vector3 position;
@@ -74,6 +78,7 @@ public:
 	                   float playerHalfWidth); // 更新
 	void Draw(Model* model, const Camera* camera); // 描画
 	void DrainEffectEvents(std::vector<EffectEvent>& events); // 発生済みイベントを移して消す
+	void NotifyCreated(); // 生成して正面に配置した直後に呼ぶ。生成の演出を通知する
 	//==========================
 	// 雪玉を持っているときの位置更新
 	//==========================
@@ -97,8 +102,11 @@ public:
 	float GetMass() const; // 半径に応じた質量
 
 	const Vector3& GetPos() const { return position_; };
+	const Vector3& GetVelocity() const { return velocity_; }
 	const float& GetRadius() const { return radius_; };
+	bool IsHeld() const { return state_ == State::kPushed; }
 	bool IsSizeMax() const;
+	float GetMaxRadius() const { return settings_.maxRadius; }
 	//=====================
 	// 接触判定
 	//=====================
@@ -111,7 +119,6 @@ public:
 	/** 雪玉と雪玉の接触判定 */
 	void SnowToSnowCollision(Snow& other);
 
-	
 private:
 	//==========================
 	// メンバ変数
@@ -126,6 +133,7 @@ private:
 	Vector3 angularVelocity_{}; // 接触の摩擦から得る角速度
 	Vector3 squashNormal_{}; // 強く当たった面の法線
 	float squashTimer_ = 0.0f; // 衝突時のつぶれが残る時間
+	float pulseTimer_ = 0.0f; // 最大サイズ到達時の膨らみが残る時間
 	Vector3 rotationSpeed_; // 雪玉の回転速度
 	Vector3 rotationAcceleration_; // 雪玉の回転加速度
 
@@ -133,8 +141,12 @@ private:
 	enum class State { kPushed, kFree, kStopped };
 
 	void ResolveMap(MapChipField& map);
+	void ConstrainToStage(const MapChipField& map);
 	void PrepareDraw();
+	void UpdatePulse(float deltaTime);
 	void NotifyMaxSizeReached(float previousRadius);
+	// outward は雪玉から壁へ向かう向き。impactSpeed は壁へ向かっていた速さ。
+	void NotifyWallHit(const Vector3& outward, float impactSpeed);
 	Settings settings_{};
 	State state_ = State::kStopped;
 	bool grounded_ = false;

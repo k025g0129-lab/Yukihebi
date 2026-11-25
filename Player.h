@@ -50,6 +50,9 @@ public:
 	void SetSnowDespawnY(float y) { snowDespawnY_ = y; }
 	void SetSpawnPosition(const Vector3& position) { spawnPosition_ = position; }
 	bool ApplyDamage(int damage);
+	void ApplyKnockback(const Vector3& direction, float speed);
+	// 水平面で球の外へ押し出し、球へ向かう速度を消す。重なっていたら true を返す。
+	bool PushOutFromSphere(const Vector3& center, float radius);
 
 	Vector3 GetVector3() { return worldTransform_.translation_; };
 	const WorldTransform& GetWorldTransform() const { return worldTransform_; }
@@ -62,6 +65,10 @@ public:
 	std::list<Snow>::iterator RemoveSnow(std::list<Snow>::iterator it);
 
 private:
+	// マップの外周を見えない壁として扱い、場外へ出ないようにする。
+	void ClampToStage();
+	void UpdateMatrix();
+
 	//==========================
 	// メンバ変数
 	//==========================

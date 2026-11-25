@@ -20,6 +20,8 @@ public:
 		float size;
 		float lifeTime;
 		float gravity;
+		// 1秒あたりの速度の減衰率。大きいほど初速で弾けてすぐ止まる。0で減衰しない。
+		float drag = 0.0f;
 	};
 
 	// エンジン初期化後に呼ぶ。再初期化時は描画リソースを再利用して粒だけ消す。
@@ -46,11 +48,14 @@ private:
 		float life = 0.0f;
 		// 出したときの寿命。濃さと大きさの比率に使う。
 		float lifeTime = 1.0f;
+		// 1秒あたりの速度の減衰率。
+		float drag = 0.0f;
 	};
 
 	// 同時に出せる粒の数。足りなければ新しい粒を出さない。
 	// 出ている粒を途中で消すより、増えないほうが見た目が安定する。
-	static constexpr size_t kMaximumParticles = 192;
+	// ボス撃破など大きな演出が重なっても途切れないよう、多めに確保する。
+	static constexpr size_t kMaximumParticles = 512;
 	std::unique_ptr<Model> model_;
 	uint32_t texture_ = 0;
 	std::array<Particle, kMaximumParticles> particles_{};
