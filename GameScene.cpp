@@ -1,6 +1,7 @@
-#include "GameScene.h"
+﻿#include "GameScene.h"
 
 #include <algorithm>
+#include <cmath>
 #include <string>
 #include <vector>
 #include "Boss.h"
@@ -143,6 +144,9 @@ void GameScene::Initialize() {
 	bossTailModel_ = Model::CreateFromOBJ("BossTail");
 	boss_ = new Boss();
 	boss_->Initialize(bossModel_, bossTailModel_, &camera_, player_);
+	previousBossHp_ = boss_->GetHp();
+	bossFrameSpeed_ = 0.0f;
+	snowBuildParticleTimer_ = 0.0f;
 	cameraController_ = new CameraController();
 	cameraController_->SetCamera(&camera_);
 	cameraController_->Initialize();
@@ -165,6 +169,9 @@ void GameScene::Update() {
 	const float elapsed = +std::chrono::duration<float>(now - previousTime_).count();
 	previousTime_ = now;
 	const float deltaTime = std::clamp(elapsed, 0.0f, 0.05f);
+	if (deltaTime <= 0.0f) {
+		return;
+	}
 	if (UpdateHitStop(deltaTime)) {
 		// 世界の時間だけ止める。揺れは実フレームで進め、粒の描画状態は保持する。
 		effects_->Update(0.0f);
@@ -173,6 +180,21 @@ void GameScene::Update() {
 	}
 	player_->Update(deltaTime);
 	UpdateLighting();
+	// 雪玉を転がしている間、移動した雪玉の周囲に小さな雪粒を出す。
+	snowBuildParticleTimer_ -= deltaTime;
+	for (const Snow& snow : player_->GetSnows()) {
+		if (!snow.IsHeld() || LengthSquared(snow.GetVelocity()) < 0.04f || snowBuildParticleTimer_ > 0.0f) {
+			continue;
+		}
+		snowBuildParticleTimer_ = 0.06f;
+		for (int index = 0; index < 3; ++index) {
+			const Vector3 direction = Random::Direction();
+			effects_->Spawn({snow.GetPos() + direction * snow.GetRadius(),
+			                 direction * Random::Float(0.3f, 1.0f), {0.85f, 0.95f, 1.0f, 1.0f},
+			                 0.018f, Random::Float(0.2f, 0.4f), 2.0f});
+		}
+		break;
+	}
 	snowPhysicsAccumulator_ += deltaTime;
 	while (snowPhysicsAccumulator_ >= kSnowPhysicsStep) {
 		player_->UpdateSnowPhysics(kSnowPhysicsStep, mapChipField_);
@@ -190,17 +212,26 @@ void GameScene::Update() {
 		cameraController_->UpdateShakeOnly(cameraController_->GetFollowPosition());
 		return;
 	}
-	effects_->Update(deltaTime);
-	cameraController_->Update();
+	const Vector3 previousBossPosition = boss_->GetWorldTransform().translation_;
 	boss_->Update(deltaTime);
+	bossFrameSpeed_ = Length(boss_->GetWorldTransform().translation_ - previousBossPosition) / deltaTime;
+	ProcessBossDamage(bossFrameSpeed_);
 	if (boss_->IsDead()) {
 		isClear_ = true;
-		return;
 	}
 
 
 	//当たり判定
 	CheckAllCollisions();
+	if (boss_->IsDead()) {
+		isClear_ = true;
+	}
+	effects_->Update(hitStopRemainingSeconds_ > 0.0f ? 0.0f : deltaTime);
+	if (hitStopRemainingSeconds_ > 0.0f) {
+		cameraController_->UpdateShakeOnly(cameraController_->GetFollowPosition());
+	} else {
+		cameraController_->Update();
+	}
 	if (player_->IsDead()) {
 		finished_ = true;
 	}
@@ -209,6 +240,52 @@ void GameScene::Update() {
 void GameScene::SetPlayerContactDamage(int headDamage, int tailDamage) {
 	playerHeadContactDamage_ = (std::max)(0, headDamage);
 	playerTailContactDamage_ = (std::max)(0, tailDamage);
+}
+
+void GameScene::SetBossFeedbackSettings(const BossFeedbackSettings& settings) {
+	bossFeedbackSettings_ = settings;
+	bossFeedbackSettings_.playerHitStopSeconds = (std::max)(0.0f, settings.playerHitStopSeconds);
+	bossFeedbackSettings_.snowBreakHitStopSeconds = (std::max)(0.0f, settings.snowBreakHitStopSeconds);
+	bossFeedbackSettings_.eatHitStopSeconds = (std::max)(0.0f, settings.eatHitStopSeconds);
+	bossFeedbackSettings_.damageHitStopSeconds = (std::max)(0.0f, settings.damageHitStopSeconds);
+	bossFeedbackSettings_.fullStrengthSpeed = (std::max)(0.001f, settings.fullStrengthSpeed);
+	bossFeedbackSettings_.playerKnockbackSpeed = (std::max)(0.0f, settings.playerKnockbackSpeed);
+	bossFeedbackSettings_.shakeAmplitude = (std::max)(0.0f, settings.shakeAmplitude);
+	bossFeedbackSettings_.shakeDurationFrames = (std::max)(0.0f, settings.shakeDurationFrames);
+	bossFeedbackSettings_.snowDamageMinSpeed = (std::max)(0.0f, settings.snowDamageMinSpeed);
+	bossFeedbackSettings_.snowBodyDamage = (std::max)(0, settings.snowBodyDamage);
+}
+
+void GameScene::ProcessBossDamage(float impactSpeed) {
+	if (boss_->GetHp() >= previousBossHp_) {
+		return;
+	}
+	previousBossHp_ = boss_->GetHp();
+	const Vector3 hitPosition = boss_->GetWorldTransform().translation_;
+	SpawnBossEffect(hitPosition, {0.0f, 1.0f, 0.0f}, 0.5f,
+	                {1.0f, 0.45f, 0.25f, 1.0f}, 30, 4.0f);
+	RequestImpactFeedback(bossFeedbackSettings_.damageHitStopSeconds,
+	                      bossFeedbackSettings_.shakeAmplitude, impactSpeed,
+	                      bossFeedbackSettings_.fullStrengthSpeed);
+}
+
+void GameScene::RequestImpactFeedback(float stopSeconds, float shakeAmplitude,
+                                      float impactSpeed, float fullStrengthSpeed) {
+	const float strength = std::clamp(impactSpeed / (std::max)(fullStrengthSpeed, 0.001f), 0.0f, 1.0f);
+	RequestHitStop(stopSeconds * strength);
+	cameraController_->RequestShake(shakeAmplitude * strength, bossFeedbackSettings_.shakeDurationFrames);
+}
+
+void GameScene::SpawnBossEffect(const Vector3& position, const Vector3& normal, float radius,
+                                const Vector4& color, int count, float speed) {
+	effects_->Spawn({position, {}, color, (std::max)(0.05f, radius * 0.18f), 0.10f, 0.0f});
+	for (int index = 0; index < count; ++index) {
+		const Vector3 direction = ScatterAlongContact(normal, 0.55f);
+		if (!effects_->Spawn({position + direction * 0.03f, direction * Random::Float(speed * 0.4f, speed),
+		                     color, Random::Float(0.025f, 0.055f), Random::Float(0.2f, 0.45f), 3.0f})) {
+			break;
+		}
+	}
 }
 
 void GameScene::SetSnowEffectFeedbackSettings(const SnowEffectFeedbackSettings& settings) {
@@ -292,35 +369,92 @@ void GameScene::Draw() {
 }
 
 void GameScene::CheckAllCollisions() {
+	if (boss_->IsDead()) {
+		return;
+	}
 	// 頭または胴体との接触でダメージを与える。連続接触はPlayer側の無敵時間で抑える。
 	const Vector3 playerPosition = player_->GetWorldTransform().translation_;
 	const float playerRadius = player_->GetCollisionRadius();
 	const WorldTransform& bossTransform = boss_->GetWorldTransform();
+	Vector3 contactPosition = bossTransform.translation_;
+	int contactDamage = 0;
 	if (IsCollisionBallToBall(playerPosition, playerRadius,
-	                          bossTransform.translation_, bossTransform.scale_.x)) {
-		player_->ApplyDamage(playerHeadContactDamage_);
-	}
-	else {
+	                          contactPosition, bossTransform.scale_.x)) {
+		contactDamage = playerHeadContactDamage_;
+	} else {
 		for (std::size_t index = 0; index < boss_->GetTailCount(); ++index) {
 			if (IsCollisionBallToBall(playerPosition, playerRadius,
 			                          boss_->GetTailPos(index), boss_->GetTailRadius())) {
-				player_->ApplyDamage(playerTailContactDamage_);
+				contactPosition = boss_->GetTailPos(index);
+				contactDamage = playerTailContactDamage_;
 				break;
 			}
 		}
 	}
+	if (player_->ApplyDamage(contactDamage)) {
+		Vector3 knockback = playerPosition - contactPosition;
+		knockback.y = 0.0f;
+		if (LengthSquared(knockback) <= 0.000001f) {
+			const float yaw = bossTransform.rotation_.y;
+			knockback = {std::sin(yaw), 0.0f, std::cos(yaw)};
+		}
+		player_->ApplyKnockback(knockback, bossFeedbackSettings_.playerKnockbackSpeed);
+		const float speed = (std::max)(bossFrameSpeed_, Length(player_->GetVelocity()));
+		RequestImpactFeedback(bossFeedbackSettings_.playerHitStopSeconds,
+		                      bossFeedbackSettings_.shakeAmplitude, speed,
+		                      bossFeedbackSettings_.fullStrengthSpeed);
+		SpawnBossEffect(playerPosition, Normalize(knockback), playerRadius,
+		                {1.0f, 0.55f, 0.3f, 1.0f}, 16, 3.0f);
+	}
 
-	// 口に触れた最大サイズの雪玉だけを消費する。上限で胴体を増やせない場合は残す。
+	// 口を先に判定する。口以外の本体や尻尾に触れた雪玉はサイズに関わらず壊す。
 	auto& snows = player_->GetSnows();
 	for (auto it = snows.begin(); it != snows.end();) {
-		if (it->IsSizeMax() &&
-			IsCollisionBallToBall(it->GetPos(), it->GetRadius(), boss_->GetMouthPos(), boss_->GetMouthRadius()) &&
-			boss_->TryEatSnow()) {
+		const Vector3 snowPosition = it->GetPos();
+		const float snowRadius = it->GetRadius();
+		const float impactSpeed = Length(it->GetVelocity());
+		const Vector3 mouthPosition = boss_->GetMouthPos();
+		const bool atMouth = IsCollisionBallToBall(snowPosition, snowRadius,
+		                                        mouthPosition, boss_->GetMouthRadius()) != 0;
+		if (atMouth && it->IsSizeMax() && boss_->TryEatSnow()) {
+			SpawnBossEffect(mouthPosition, Normalize(snowPosition - mouthPosition), snowRadius,
+			                {1.0f, 0.85f, 0.45f, 1.0f}, 24, 3.5f);
+			RequestImpactFeedback(bossFeedbackSettings_.eatHitStopSeconds,
+			                      bossFeedbackSettings_.shakeAmplitude, impactSpeed,
+			                      bossFeedbackSettings_.fullStrengthSpeed);
 			it = player_->RemoveSnow(it);
+			continue;
 		}
-		else {
+		bool bodyHit = IsCollisionBallToBall(snowPosition, snowRadius,
+		                                 bossTransform.translation_, bossTransform.scale_.x) != 0;
+		Vector3 bodyPosition = bossTransform.translation_;
+		if (!bodyHit) {
+			for (std::size_t index = 0; index < boss_->GetTailCount(); ++index) {
+				if (IsCollisionBallToBall(snowPosition, snowRadius,
+				                          boss_->GetTailPos(index), boss_->GetTailRadius())) {
+					bodyHit = true;
+					bodyPosition = boss_->GetTailPos(index);
+					break;
+				}
+			}
+		}
+		if (!bodyHit || atMouth) {
 			++it;
+			continue;
 		}
+		const Vector3 normal = Normalize(snowPosition - bodyPosition);
+		SpawnBossEffect(snowPosition - normal * snowRadius, normal, snowRadius,
+		                {1.0f, 0.65f, 0.3f, 1.0f}, 12, 2.5f);
+		SpawnBossEffect(snowPosition, normal, snowRadius,
+		                {0.75f, 0.93f, 1.0f, 1.0f}, 24, 4.0f);
+		if (impactSpeed >= bossFeedbackSettings_.snowDamageMinSpeed &&
+		    boss_->ApplyDamage(bossFeedbackSettings_.snowBodyDamage)) {
+			ProcessBossDamage(impactSpeed);
+		}
+		RequestImpactFeedback(bossFeedbackSettings_.snowBreakHitStopSeconds,
+		                      bossFeedbackSettings_.shakeAmplitude, impactSpeed,
+		                      bossFeedbackSettings_.fullStrengthSpeed);
+		it = player_->RemoveSnow(it);
 	}
 }
 

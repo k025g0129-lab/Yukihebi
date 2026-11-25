@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <KamataEngine.h>
 #include <chrono>
 #include <memory>
@@ -24,6 +24,18 @@ public:
 		float shakeDurationFrames = 8.0f;
 		float fullStrengthImpactSpeed = 6.0f;
 	};
+	struct BossFeedbackSettings {
+		float playerHitStopSeconds = 0.08f;
+		float snowBreakHitStopSeconds = 0.045f;
+		float eatHitStopSeconds = 0.07f;
+		float damageHitStopSeconds = 0.12f;
+		float fullStrengthSpeed = 8.0f;
+		float playerKnockbackSpeed = 7.0f;
+		float shakeAmplitude = 0.16f;
+		float shakeDurationFrames = 8.0f;
+		float snowDamageMinSpeed = 3.0f;
+		int snowBodyDamage = 1;
+	};
 
 	GameScene();
 	~GameScene();
@@ -32,6 +44,7 @@ public:
 	void Draw();
 	void SetSnowEffectFeedbackSettings(const SnowEffectFeedbackSettings& settings);
 	void SetPlayerContactDamage(int headDamage, int tailDamage);
+	void SetBossFeedbackSettings(const BossFeedbackSettings& settings);
 
 
 	//デストラクタのgetter
@@ -51,6 +64,9 @@ private:
 	void RequestHitStop(float durationSeconds);
 	bool UpdateHitStop(float deltaTime);
 	void RequestSnowEffectFeedback(const Snow::EffectEvent& event);
+	void RequestImpactFeedback(float stopSeconds, float shakeAmplitude, float impactSpeed, float fullStrengthSpeed);
+	void SpawnBossEffect(const Vector3& position, const Vector3& normal, float radius, const Vector4& color, int count, float speed);
+	void ProcessBossDamage(float impactSpeed);
 	std::unique_ptr<LightGroup> playerLightGroup_;
 
 	MapChipField mapChipField_{};
@@ -64,6 +80,10 @@ private:
 	float snowPhysicsAccumulator_ = 0.0f;
 	float hitStopRemainingSeconds_ = 0.0f;
 	SnowEffectFeedbackSettings snowEffectFeedbackSettings_{};
+	BossFeedbackSettings bossFeedbackSettings_{};
+	int previousBossHp_ = 0;
+	float bossFrameSpeed_ = 0.0f;
+	float snowBuildParticleTimer_ = 0.0f;
 	int playerHeadContactDamage_ = 1;
 	int playerTailContactDamage_ = 1;
 	static constexpr float kSnowPhysicsStep = 1.0f / 120.0f;

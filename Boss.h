@@ -64,6 +64,13 @@ public:
 	bool IsDead() const { return hp_ <= 0; }
 	int GetHp() const { return hp_; }
 	int GetMaxHp() const { return kMaxHp; }
+	bool ApplyDamage(int damage) {
+		if (damage <= 0 || IsDead()) {
+			return false;
+		}
+		hp_ = (std::max)(0, hp_ - damage);
+		return true;
+	}
 
 
 	//セッター

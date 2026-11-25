@@ -97,7 +97,9 @@ public:
 	float GetMass() const; // 半径に応じた質量
 
 	const Vector3& GetPos() const { return position_; };
+	const Vector3& GetVelocity() const { return velocity_; }
 	const float& GetRadius() const { return radius_; };
+	bool IsHeld() const { return state_ == State::kPushed; }
 	bool IsSizeMax() const;
 	//=====================
 	// 接触判定
@@ -133,6 +135,7 @@ private:
 	enum class State { kPushed, kFree, kStopped };
 
 	void ResolveMap(MapChipField& map);
+	void ConstrainToStage(const MapChipField& map);
 	void PrepareDraw();
 	void NotifyMaxSizeReached(float previousRadius);
 	Settings settings_{};

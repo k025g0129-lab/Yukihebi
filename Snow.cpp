@@ -94,6 +94,7 @@ void Snow::UpdateHeld(const Vector3& playerPosition, const Vector3& playerVeloci
 	grounded_ = false;
 	if (map != nullptr) {
 		ResolveMap(*map);
+		ConstrainToStage(*map);
 	}
 
 	const Vector3 moved = {position_.x - previousPosition.x, 0.0f, position_.z - previousPosition.z};
@@ -110,6 +111,9 @@ void Snow::UpdateHeld(const Vector3& playerPosition, const Vector3& playerVeloci
 			position_.y += radius_ - previousRadius;
 			NotifyMaxSizeReached(previousRadius);
 		}
+	}
+	if (map != nullptr) {
+		ConstrainToStage(*map);
 	}
 	angularVelocity_ = Cross(Vector3{0.0f, 1.0f, 0.0f}, velocity_) / (std::max)(radius_, 0.001f);
 	rotation_ += angularVelocity_ * deltaTime;
@@ -291,6 +295,7 @@ void Snow::UpdatePhysics(float deltaTime, MapChipField& map, const Vector3& play
 
 		grounded_ = false;
 		ResolveMap(map);
+		ConstrainToStage(map);
 
 		if (grounded_) {
 			const float speed = std::sqrt(velocity_.x * velocity_.x + velocity_.z * velocity_.z);
@@ -332,9 +337,27 @@ void Snow::UpdatePhysics(float deltaTime, MapChipField& map, const Vector3& play
 		}
 	}
 
+	ConstrainToStage(map);
 	PrepareDraw();
 }
 
+
+void Snow::ConstrainToStage(const MapChipField& map) {
+	const float halfWidth = map.GetLoadedBlockHorizontal() * MapChipField::kBlockWindth * 0.5f;
+	const float halfDepth = map.GetLoadedBlockVirtical() * MapChipField::kBlockHeight * 0.5f;
+	const float maxX = (std::max)(0.0f, halfWidth - radius_);
+	const float maxZ = (std::max)(0.0f, halfDepth - radius_);
+	const float x = std::clamp(position_.x, -maxX, maxX);
+	const float z = std::clamp(position_.z, -maxZ, maxZ);
+	if (x != position_.x) {
+		position_.x = x;
+		velocity_.x = 0.0f;
+	}
+	if (z != position_.z) {
+		position_.z = z;
+		velocity_.z = 0.0f;
+	}
+}
 
 void Snow::ResolveMap(MapChipField& map) {
 	bool touchedGround = false;

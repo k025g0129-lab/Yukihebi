@@ -50,6 +50,7 @@ public:
 	void SetSnowDespawnY(float y) { snowDespawnY_ = y; }
 	void SetSpawnPosition(const Vector3& position) { spawnPosition_ = position; }
 	bool ApplyDamage(int damage);
+	void ApplyKnockback(const Vector3& direction, float speed);
 
 	Vector3 GetVector3() { return worldTransform_.translation_; };
 	const WorldTransform& GetWorldTransform() const { return worldTransform_; }
