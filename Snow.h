@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <KamataEngine.h>
 #include <vector>
 #include "GameMath.h"
@@ -15,7 +15,7 @@ public:
 
 	struct Settings {
 		float initialRadius = 0.2f;
-		float maxRadius = 1.0f;
+		float maxRadius = 0.7f;
 		float growthPerDistance = 0.25f;
 		float placementGap = 0.05f;
 
@@ -49,6 +49,7 @@ public:
 
 	// 判定側は発生事実だけを通知し、粒の色や数はGameSceneで決める。
 	enum class EffectType { kPlayerHit, kSnowHit, kMaxSize };
+
 	struct EffectEvent {
 		EffectType type;
 		Vector3 position;
@@ -113,7 +114,6 @@ public:
 	/** 雪玉と雪玉の接触判定 */
 	void SnowToSnowCollision(Snow& other);
 
-	
 private:
 	//==========================
 	// メンバ変数

@@ -1,12 +1,12 @@
-﻿#pragma once
+#pragma once
 #include <KamataEngine.h>
-#include <memory>
-#include "GameMath.h"
 #include <algorithm>
-#include <list>
-#include <iterator>
-#include <vector>
 #include <cstddef>
+#include <iterator>
+#include <list>
+#include <memory>
+#include <vector>
+#include "GameMath.h"
 
 
 #include <cmath>
@@ -37,9 +37,7 @@ enum RushAttack {
 struct Footprint {
 	Vector3 pos;
 	Vector3 rot;
-	
 };
-
 
 
 class Boss {
@@ -64,6 +62,7 @@ public:
 	bool IsDead() const { return hp_ <= 0; }
 	int GetHp() const { return hp_; }
 	int GetMaxHp() const { return kMaxHp; }
+
 	bool ApplyDamage(int damage) {
 		if (damage <= 0 || IsDead()) {
 			return false;
@@ -103,19 +102,19 @@ private:
 	float selfCollisionAgeSeconds_ = 0.0f;
 	float selfHitCooldownRemaining_ = 0.0f;
 
-	static inline const int kMaxHp = 5;
-	static inline const float kMinSelfImpactSpeed = 1.0f;
-	static inline const float kDamagePerImpactSpeed = 0.5f;
-	static inline const float kSelfHitCooldownSeconds = 0.6f;
-	static inline const float kInitialSelfCollisionDelaySeconds = 1.5f;
-	static inline const std::size_t kIgnoredFrontSegments = 2;
+	static constexpr int kMaxHp = 5;
+	static constexpr float kMinSelfImpactSpeed = 1.0f;
+	static constexpr float kDamagePerImpactSpeed = 0.5f;
+	static constexpr float kSelfHitCooldownSeconds = 0.6f;
+	static constexpr float kInitialSelfCollisionDelaySeconds = 1.5f;
+	static constexpr std::size_t kIgnoredFrontSegments = 2;
 
-	// 既存の追跡・突進の値
-	static inline const float kMaxWalkSpeed = 0.03f;
-	static inline const float kMaxTurnAngle = 0.05f;
-	static inline const float kMaxFaceTowardChargeTime = 5.0f;
-	static inline const float kMaxRushChargeTime = 1.0f;
-	static inline const float kMaxRushTime = 3.0f;
+	// 追跡・突進の値
+	static constexpr float kMaxWalkSpeed = 0.03f;
+	static constexpr float kMaxTurnAngle = 0.05f;
+	static constexpr float kMaxFaceTowardChargeTime = 5.0f;
+	static constexpr float kMaxRushChargeTime = 1.0f;
+	static constexpr float kMaxRushTime = 3.0f;
 	RushAttack rushAttack;
 	float rushT = 0.0f;
 
@@ -124,17 +123,15 @@ private:
 	Model* tailModel_ = nullptr;
 	std::vector<std::unique_ptr<BossTail>> bossTails_;
 	BossTail* bossTail_;
-	static inline const int kDefaultMaxTail = 0;
-	static inline const int kMaxTail = 15;
-	static inline const int kTailInterval = 30;
-	static inline const int kMaxFootprint = kMaxTail * kTailInterval + 1;
-	std::list < Footprint >footprints_; 
-	static inline const float kTailRadius = 0.5f;
+	static constexpr int kDefaultMaxTail = 5;
+	static constexpr int kMaxTail = 30;
+	static constexpr int kTailInterval = 30;
+	static constexpr int kMaxFootprint = kMaxTail * kTailInterval + 1;
+	std::list<Footprint> footprints_;
+	static constexpr float kTailRadius = 0.5f;
 
 	//口
 	BossTail mouth;
-	static inline const float kMouthRange = 1.0f;
-	static inline const float kMouthRadius = 0.5f;
-
-
+	static constexpr float kMouthRange = 1.0f;
+	static constexpr float kMouthRadius = 0.5f;
 };
