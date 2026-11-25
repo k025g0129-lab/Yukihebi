@@ -1,4 +1,4 @@
-﻿#include "GameScene.h"
+#include "GameScene.h"
 
 #include <algorithm>
 #include <cmath>
@@ -151,8 +151,8 @@ void GameScene::Initialize() {
 	cameraController_->SetCamera(&camera_);
 	cameraController_->Initialize();
 	cameraController_->SetTarget(player_);
-	cameraController_->targetOffset_ = {0.0f, 15.0f, -6.0f};
-	cameraController_->SetRotation_({1.3962634015955f, 0.0f, 0.0f});
+	cameraController_->targetOffset_ = {0.0f, 20.0f, -3.0f};
+	cameraController_->SetRotation_({1.4835298641952f, 0.0f, 0.0f});
 	CameraController::Rect movableArea{};
 	movableArea.left = -halfMapWidth;
 	movableArea.right = halfMapWidth;
@@ -189,9 +189,11 @@ void GameScene::Update() {
 		snowBuildParticleTimer_ = 0.06f;
 		for (int index = 0; index < 3; ++index) {
 			const Vector3 direction = Random::Direction();
-			effects_->Spawn({snow.GetPos() + direction * snow.GetRadius(),
-			                 direction * Random::Float(0.3f, 1.0f), {0.85f, 0.95f, 1.0f, 1.0f},
-			                 0.018f, Random::Float(0.2f, 0.4f), 2.0f});
+			effects_->Spawn({
+				snow.GetPos() + direction * snow.GetRadius(),
+				direction * Random::Float(0.3f, 1.0f), {0.85f, 0.95f, 1.0f, 1.0f},
+				0.018f, Random::Float(0.2f, 0.4f), 2.0f
+			});
 		}
 		break;
 	}
@@ -229,7 +231,8 @@ void GameScene::Update() {
 	effects_->Update(hitStopRemainingSeconds_ > 0.0f ? 0.0f : deltaTime);
 	if (hitStopRemainingSeconds_ > 0.0f) {
 		cameraController_->UpdateShakeOnly(cameraController_->GetFollowPosition());
-	} else {
+	}
+	else {
 		cameraController_->Update();
 	}
 	if (player_->IsDead()) {
@@ -281,8 +284,10 @@ void GameScene::SpawnBossEffect(const Vector3& position, const Vector3& normal, 
 	effects_->Spawn({position, {}, color, (std::max)(0.05f, radius * 0.18f), 0.10f, 0.0f});
 	for (int index = 0; index < count; ++index) {
 		const Vector3 direction = ScatterAlongContact(normal, 0.55f);
-		if (!effects_->Spawn({position + direction * 0.03f, direction * Random::Float(speed * 0.4f, speed),
-		                     color, Random::Float(0.025f, 0.055f), Random::Float(0.2f, 0.45f), 3.0f})) {
+		if (!effects_->Spawn({
+			position + direction * 0.03f, direction * Random::Float(speed * 0.4f, speed),
+			color, Random::Float(0.025f, 0.055f), Random::Float(0.2f, 0.45f), 3.0f
+		})) {
 			break;
 		}
 	}
@@ -381,7 +386,8 @@ void GameScene::CheckAllCollisions() {
 	if (IsCollisionBallToBall(playerPosition, playerRadius,
 	                          contactPosition, bossTransform.scale_.x)) {
 		contactDamage = playerHeadContactDamage_;
-	} else {
+	}
+	else {
 		for (std::size_t index = 0; index < boss_->GetTailCount(); ++index) {
 			if (IsCollisionBallToBall(playerPosition, playerRadius,
 			                          boss_->GetTailPos(index), boss_->GetTailRadius())) {
@@ -415,7 +421,7 @@ void GameScene::CheckAllCollisions() {
 		const float impactSpeed = Length(it->GetVelocity());
 		const Vector3 mouthPosition = boss_->GetMouthPos();
 		const bool atMouth = IsCollisionBallToBall(snowPosition, snowRadius,
-		                                        mouthPosition, boss_->GetMouthRadius()) != 0;
+		                                           mouthPosition, boss_->GetMouthRadius()) != 0;
 		if (atMouth && it->IsSizeMax() && boss_->TryEatSnow()) {
 			SpawnBossEffect(mouthPosition, Normalize(snowPosition - mouthPosition), snowRadius,
 			                {1.0f, 0.85f, 0.45f, 1.0f}, 24, 3.5f);
@@ -426,7 +432,7 @@ void GameScene::CheckAllCollisions() {
 			continue;
 		}
 		bool bodyHit = IsCollisionBallToBall(snowPosition, snowRadius,
-		                                 bossTransform.translation_, bossTransform.scale_.x) != 0;
+		                                     bossTransform.translation_, bossTransform.scale_.x) != 0;
 		Vector3 bodyPosition = bossTransform.translation_;
 		if (!bodyHit) {
 			for (std::size_t index = 0; index < boss_->GetTailCount(); ++index) {
@@ -448,7 +454,7 @@ void GameScene::CheckAllCollisions() {
 		SpawnBossEffect(snowPosition, normal, snowRadius,
 		                {0.75f, 0.93f, 1.0f, 1.0f}, 24, 4.0f);
 		if (impactSpeed >= bossFeedbackSettings_.snowDamageMinSpeed &&
-		    boss_->ApplyDamage(bossFeedbackSettings_.snowBodyDamage)) {
+			boss_->ApplyDamage(bossFeedbackSettings_.snowBodyDamage)) {
 			ProcessBossDamage(impactSpeed);
 		}
 		RequestImpactFeedback(bossFeedbackSettings_.snowBreakHitStopSeconds,
@@ -547,5 +553,6 @@ void GameScene::UpdateLighting() {
 	playerModel_->SetLightGroup(playerLightGroup_.get());
 	snowModel_->SetLightGroup(playerLightGroup_.get());
 	bossModel_->SetLightGroup(playerLightGroup_.get());
+	bossTailModel_->SetLightGroup(playerLightGroup_.get());
 	playerLightGroup_->Update();
 }
