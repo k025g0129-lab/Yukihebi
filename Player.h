@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <list>
 #include <vector>
@@ -42,7 +42,11 @@ public:
 	void SetGravityPerFrame(float gravity) { gravity_ = gravity * 60.0f * 60.0f; } // 従来のフレーム単位の値を換算する
 	void SetSpaceRiseSpeed(float speed) { spaceRiseSpeed_ = speed; } // スペースキーで上昇する速度を設定する
 	void SetMaxFallSpeed(float speed) { maxFallSpeed_ = speed * 60.0f; } // 従来のフレーム単位の値を換算する
-	void SetMaxHp(int hp) { maxHp_ = hp > 0 ? hp : 1; hp_ = maxHp_; }
+	void SetMaxHp(int hp) {
+		maxHp_ = hp > 0 ? hp : 1;
+		hp_ = maxHp_;
+	}
+
 	void SetDamageInvincibilitySeconds(float seconds) { damageInvincibilitySeconds_ = seconds > 0.0f ? seconds : 0.0f; }
 	void SetKickSpeed(float speed) { kickSpeed_ = speed > 0.0f ? speed : 0.0f; }
 	void SetKickReach(float reach) { kickReach_ = reach > 0.0f ? reach : 0.0f; }
@@ -54,6 +58,7 @@ public:
 	// 水平面で球の外へ押し出し、球へ向かう速度を消す。重なっていたら true を返す。
 	bool PushOutFromSphere(const Vector3& center, float radius);
 
+	Vector3 GetRotate() { return worldTransform_.rotation_; };
 	Vector3 GetVector3() { return worldTransform_.translation_; };
 	const WorldTransform& GetWorldTransform() const { return worldTransform_; }
 	const Vector3& GetVelocity() const { return velocity_; }

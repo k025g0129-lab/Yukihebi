@@ -101,10 +101,10 @@ namespace {
 	void SpawnExplosion(Effects& effects, const Vector3& center, const Vector4& color, float scale) {
 		SpawnFlash(effects, center, {1.0f, 1.0f, 0.9f, 1.0f}, 0.12f * scale, 0.1f);
 		SpawnBurst(effects, {
-			.position = center, .color = color, .count = static_cast<int>(20.0f * scale),
-			.minSpeed = 3.0f * scale, .maxSpeed = 9.0f * scale, .minSize = 0.06f, .maxSize = 0.12f,
-			.minLife = 0.4f, .maxLife = 0.8f, .drag = 5.0f, .sphere = true
-		});
+			           .position = center, .color = color, .count = static_cast<int>(20.0f * scale),
+			           .minSpeed = 3.0f * scale, .maxSpeed = 9.0f * scale, .minSize = 0.06f, .maxSize = 0.12f,
+			           .minLife = 0.4f, .maxLife = 0.8f, .drag = 5.0f, .sphere = true
+		           });
 		SpawnRing(effects, center, {1.0f, 0.9f, 0.7f, 1.0f}, static_cast<int>(12.0f * scale), 8.0f * scale,
 		          0.07f, 0.35f, 6.0f);
 	}
@@ -179,31 +179,31 @@ namespace {
 		SpawnFlash(effects, event.position, {0.9f, 0.97f, 1.0f, 1.0f}, 0.05f + event.radius * 0.12f * power, 0.08f);
 		// 壁からステージの内側へ雪を噴き出させる。
 		SpawnBurst(effects, {
-			.position = event.position, .normal = event.normal, .color = {0.75f, 0.92f, 1.0f, 1.0f},
-			.count = 12 + static_cast<int>(power * 24.0f), .minSpeed = 2.0f, .maxSpeed = 4.0f + power * 7.0f,
-			.minSize = 0.03f + event.radius * 0.04f, .maxSize = 0.05f + event.radius * 0.07f,
-			.minLife = 0.25f, .maxLife = 0.5f, .normalSpread = 0.3f, .normalBias = 0.8f, .drag = 8.0f
-		});
+			           .position = event.position, .normal = event.normal, .color = {0.75f, 0.92f, 1.0f, 1.0f},
+			           .count = 12 + static_cast<int>(power * 24.0f), .minSpeed = 2.0f, .maxSpeed = 4.0f + power * 7.0f,
+			           .minSize = 0.03f + event.radius * 0.04f, .maxSize = 0.05f + event.radius * 0.07f,
+			           .minLife = 0.25f, .maxLife = 0.5f, .normalSpread = 0.3f, .normalBias = 0.8f, .drag = 8.0f
+		           });
 	}
 
 	void SpawnKickEffect(Effects& effects, const Snow::EffectEvent& event) {
 		// 蹴った足元の閃光と、Player側へ跳ね返る雪の破片。
 		SpawnFlash(effects, event.position, {1.0f, 1.0f, 0.9f, 1.0f}, 0.06f + event.radius * 0.12f, 0.08f);
 		SpawnBurst(effects, {
-			.position = event.position, .normal = event.normal, .color = {0.9f, 0.97f, 1.0f, 1.0f},
-			.count = 20, .minSpeed = 2.0f, .maxSpeed = 6.0f, .minSize = 0.03f, .maxSize = 0.06f,
-			.minLife = 0.2f, .maxLife = 0.4f, .normalSpread = 0.4f, .normalBias = 0.5f, .drag = 9.0f
-		});
+			           .position = event.position, .normal = event.normal, .color = {0.9f, 0.97f, 1.0f, 1.0f},
+			           .count = 20, .minSpeed = 2.0f, .maxSpeed = 6.0f, .minSize = 0.03f, .maxSize = 0.06f,
+			           .minLife = 0.2f, .maxLife = 0.4f, .normalSpread = 0.4f, .normalBias = 0.5f, .drag = 9.0f
+		           });
 		SpawnRing(effects, event.position, {1.0f, 1.0f, 1.0f, 1.0f}, 14, 4.5f, 0.04f, 0.22f, 8.0f);
 	}
 
 	void SpawnCreateEffect(Effects& effects, const Snow::EffectEvent& event) {
 		// 雪をすくい上げたような小さな粒をふわっと出す。
 		SpawnBurst(effects, {
-			.position = event.position, .color = {0.85f, 0.95f, 1.0f, 1.0f}, .count = 12,
-			.minSpeed = 0.6f, .maxSpeed = 1.8f, .minSize = 0.025f, .maxSize = 0.045f,
-			.minLife = 0.3f, .maxLife = 0.5f, .drag = 3.0f, .sphere = true
-		});
+			           .position = event.position, .color = {0.85f, 0.95f, 1.0f, 1.0f}, .count = 12,
+			           .minSpeed = 0.6f, .maxSpeed = 1.8f, .minSize = 0.025f, .maxSize = 0.045f,
+			           .minLife = 0.3f, .maxLife = 0.5f, .drag = 3.0f, .sphere = true
+		           });
 	}
 
 	void SpawnSnowEffect(Effects& effects, const Snow::EffectEvent& event) {
@@ -299,6 +299,23 @@ void GameScene::Initialize() {
 }
 
 void GameScene::Update() {
+	if (input->TriggerKey(DIK_F1)) {
+		firstPerson = !firstPerson;
+		if (firstPerson) {
+			cameraController_->targetOffset_ = {0.0f, 0.0f, 0.0f};
+			Vector3 playerRotate = player_->GetRotate();
+			cameraController_->SetRotation_({playerRotate.x, playerRotate.y, playerRotate.z});
+		}
+		else {
+			cameraController_->targetOffset_ = {0.0f, 20.0f, -3.0f};
+			cameraController_->SetRotation_({1.4835298641952f, 0.0f, 0.0f});
+		}
+	}
+	if (firstPerson) {
+		Vector3 playerRotate = player_->GetRotate();
+		cameraController_->SetRotation_({playerRotate.x, playerRotate.y, playerRotate.z});
+	}
+
 	const auto now = std::chrono::steady_clock::now();
 	const float elapsed = +std::chrono::duration<float>(now - previousTime_).count();
 	previousTime_ = now;
@@ -434,7 +451,7 @@ void GameScene::UpdateEnding(float deltaTime) {
 		bossHidden_ = true;
 		const float interval = bossFeedbackSettings_.defeatChainInterval;
 		while (defeatChainIndex_ < defeatChain_.size() &&
-		       endingTimer_ >= interval * static_cast<float>(defeatChainIndex_)) {
+			endingTimer_ >= interval * static_cast<float>(defeatChainIndex_)) {
 			SpawnExplosion(*effects_, defeatChain_[defeatChainIndex_], {1.0f, 0.65f, 0.3f, 1.0f}, 1.0f);
 			cameraController_->RequestShake(0.3f, 8.0f);
 			++defeatChainIndex_;
@@ -501,10 +518,10 @@ void GameScene::ProcessBossDamage(const Vector3& hitPosition) {
 	// 当たった位置の閃光、全方向への火花、地面に広がる衝撃波。
 	SpawnFlash(*effects_, hitPosition, {1.0f, 1.0f, 1.0f, 1.0f}, 0.2f, 0.1f);
 	SpawnBurst(*effects_, {
-		.position = hitPosition, .color = {1.0f, 0.45f, 0.25f, 1.0f}, .count = 40,
-		.minSpeed = 3.0f, .maxSpeed = 9.0f, .minSize = 0.06f, .maxSize = 0.12f,
-		.minLife = 0.3f, .maxLife = 0.6f, .drag = 6.0f, .sphere = true
-	});
+		           .position = hitPosition, .color = {1.0f, 0.45f, 0.25f, 1.0f}, .count = 40,
+		           .minSpeed = 3.0f, .maxSpeed = 9.0f, .minSize = 0.06f, .maxSize = 0.12f,
+		           .minLife = 0.3f, .maxLife = 0.6f, .drag = 6.0f, .sphere = true
+	           });
 	SpawnRing(*effects_, hitPosition, {1.0f, 0.6f, 0.3f, 1.0f}, 28, 9.0f, 0.08f, 0.35f, 7.0f);
 	// ボス本体を白く光らせて一瞬膨らませる。ヒットストップ中もこの見た目で止まる。
 	boss_->RequestDamageFlash();
@@ -720,10 +737,10 @@ void GameScene::CheckAllCollisions() {
 			                {1.0f, 0.85f, 0.45f, 1.0f}, 16, 3.5f);
 			const Vector3 newTailPosition = boss_->GetTailPos(boss_->GetTailCount() - 1);
 			SpawnBurst(*effects_, {
-				.position = newTailPosition, .color = {1.0f, 0.85f, 0.45f, 1.0f}, .count = 18,
-				.minSpeed = 2.0f, .maxSpeed = 5.0f, .minSize = 0.05f, .maxSize = 0.09f,
-				.minLife = 0.3f, .maxLife = 0.5f, .drag = 6.0f, .sphere = true
-			});
+				           .position = newTailPosition, .color = {1.0f, 0.85f, 0.45f, 1.0f}, .count = 18,
+				           .minSpeed = 2.0f, .maxSpeed = 5.0f, .minSize = 0.05f, .maxSize = 0.09f,
+				           .minLife = 0.3f, .maxLife = 0.5f, .drag = 6.0f, .sphere = true
+			           });
 			boss_->RequestPulse(0.25f, 0.25f);
 			// 食べたのはボスの動作なので、雪玉の速度に関わらず一定の強さで返す。
 			RequestFixedFeedback(bossFeedbackSettings_.eatHitStopSeconds, bossFeedbackSettings_.eatShakeAmplitude,
@@ -756,12 +773,12 @@ void GameScene::CheckAllCollisions() {
 		SpawnBossEffect(snowContactPosition, normal, snowRadius,
 		                {1.0f, 0.65f, 0.3f, 1.0f}, 10 + static_cast<int>(20.0f * sizeRatio), 2.5f + 4.0f * sizeRatio);
 		SpawnBurst(*effects_, {
-			.position = snowPosition, .color = {0.75f, 0.93f, 1.0f, 1.0f},
-			.count = 16 + static_cast<int>(40.0f * sizeRatio),
-			.minSpeed = 2.0f, .maxSpeed = 4.0f + 7.0f * sizeRatio,
-			.minSize = 0.04f + 0.04f * sizeRatio, .maxSize = 0.07f + 0.08f * sizeRatio,
-			.minLife = 0.3f, .maxLife = 0.6f, .drag = 6.0f, .sphere = true
-		});
+			           .position = snowPosition, .color = {0.75f, 0.93f, 1.0f, 1.0f},
+			           .count = 16 + static_cast<int>(40.0f * sizeRatio),
+			           .minSpeed = 2.0f, .maxSpeed = 4.0f + 7.0f * sizeRatio,
+			           .minSize = 0.04f + 0.04f * sizeRatio, .maxSize = 0.07f + 0.08f * sizeRatio,
+			           .minLife = 0.3f, .maxLife = 0.6f, .drag = 6.0f, .sphere = true
+		           });
 		if (it->IsSizeMax()) {
 			SpawnRing(*effects_, snowPosition, {0.9f, 0.97f, 1.0f, 1.0f}, 24, 9.0f, 0.07f, 0.35f, 6.0f);
 		}
@@ -781,23 +798,20 @@ void GameScene::CheckAllCollisions() {
 
 		for (auto tailIndex = 0; tailIndex < boss_->GetTailCount(); tailIndex++) {
 			if (it->IsSizeMax() &&
-				IsCollisionBallToBall(it->GetPos(), it->GetRadius(),boss_->GetTailPos(tailIndex),boss_->GetTailRadius()) &&
-					boss_->TryEatSnow()) {
-
+				IsCollisionBallToBall(it->GetPos(), it->GetRadius(), boss_->GetTailPos(tailIndex),
+				                      boss_->GetTailRadius()) &&
+				boss_->TryEatSnow()) {
 				isTouch = true;
-				
 			}
 		}
 
 		if (isTouch) {
-			it = player_->RemoveSnow(it);	
-		} else {
-			it++;
+			it = player_->RemoveSnow(it);
 		}
-
+		else {
+			++it;
+		}
 	}
-
-
 }
 
 void GameScene::GenerateBlocks() {
