@@ -304,16 +304,18 @@ void Snow::UpdatePhysics(float deltaTime, MapChipField& map, const Vector3& play
 		return; // Space中はPlayer::Updateで配置・回転済み。自由物体として積分しない。
 	}
 	const bool pulsing = pulseTimer_ > 0.0f;
+	const bool squashing = squashTimer_ > 0.0f;
 	UpdatePulse(deltaTime);
+	// 止まった玉でもつぶれが固まらないよう、早期 return より前に減らす。
+	squashTimer_ = (std::max)(0.0f, squashTimer_ - deltaTime);
 	PlayerToSnowCollision(playerPosition, playerVelocity, playerHalfWidth);
 
 	if (state_ == State::kStopped) {
-		if (pulsing) {
-			PrepareDraw(); // 止まっていても膨らみは戻す
+		if (pulsing || squashing) {
+			PrepareDraw(); // 止まっていても膨らみ・つぶれは戻す
 		}
 		return;
 	}
-	squashTimer_ = (std::max)(0.0f, squashTimer_ - deltaTime);
 
 	const float maximumTravel = (std::max)(radius_ * settings_.movementStepRadiusRatio, 0.001f);
 	const float travel = (Length(velocity_) + settings_.gravity * deltaTime) * deltaTime;
@@ -400,19 +402,40 @@ void Snow::ConstrainToStage(const MapChipField& map) {
 
 void Snow::ResolveMap(MapChipField& map) {
 	bool touchedGround = false;
+	const int columns = static_cast<int>(map.GetLoadedBlockHorizontal());
+	const int rows = static_cast<int>(map.GetLoadedBlockVirtical());
+	// GetTopDownPositionByIndex の逆算に使う。マスの中心は x = column*w - centerX, z = centerZ - row*h。
+	const float centerX = (static_cast<float>(columns) - 1.0f) * MapChipField::kBlockWindth * 0.5f;
+	const float centerZ = (static_cast<float>(rows) - 1.0f) * MapChipField::kBlockHeight * 0.5f;
 
 	for (int iteration = 0; iteration < settings_.collisionIterations; ++iteration) {
 		bool found = false;
 		float deepest = -1.0f;
 		Vector3 contactNormal{};
 
-		for (uint32_t row = 0; row < map.GetLoadedBlockVirtical(); ++row) {
-			for (uint32_t column = 0; column < map.GetLoadedBlockHorizontal(); ++column) {
-				if (map.GetMapChipTypeByIndex(column, row) != MapChipType::kBlock) {
+		// 全マスを見ると玉の数×ステップ数×マス数で重くなる。球が触れうるのは
+		// 中心が「半径＋マスの半分」以内にあるマスだけなので、その範囲に絞る。
+		const float reachX = radius_ + MapChipField::kBlockWindth * 0.5f;
+		const float reachZ = radius_ + MapChipField::kBlockHeight * 0.5f;
+		const int minColumn = (std::max)(
+			0, static_cast<int>(std::floor((position_.x - reachX + centerX) / MapChipField::kBlockWindth)));
+		const int maxColumn = (std::min)(
+			columns - 1, static_cast<int>(std::ceil((position_.x + reachX + centerX) / MapChipField::kBlockWindth)));
+		// z が大きいほど row は小さい。
+		const int minRow = (std::max)(
+			0, static_cast<int>(std::floor((centerZ - (position_.z + reachZ)) / MapChipField::kBlockHeight)));
+		const int maxRow = (std::min)(
+			rows - 1, static_cast<int>(std::ceil((centerZ - (position_.z - reachZ)) / MapChipField::kBlockHeight)));
+
+		for (int row = minRow; row <= maxRow; ++row) {
+			for (int column = minColumn; column <= maxColumn; ++column) {
+				const uint32_t xIndex = static_cast<uint32_t>(column);
+				const uint32_t yIndex = static_cast<uint32_t>(row);
+				if (map.GetMapChipTypeByIndex(xIndex, yIndex) != MapChipType::kBlock) {
 					continue;
 				}
 
-				const Vector3 chip = map.GetTopDownPositionByIndex(column, row);
+				const Vector3 chip = map.GetTopDownPositionByIndex(xIndex, yIndex);
 				constexpr Vector3 half = {
 					MapChipField::kBlockWindth * 0.5f, MapChipField::kTopDownBlockThickness * 0.5f,
 					MapChipField::kBlockHeight * 0.5f
@@ -514,7 +537,8 @@ void Snow::ResolveMap(MapChipField& map) {
 			angularVelocity_ += Cross(arm, impulse) / inertia;
 		}
 
-		if (normalImpulse >= settings_.squashImpulse) {
+		// 質量込みの衝撃で判定すると、重い玉は床に乗っているだけで毎ステップつぶれる。当たった速さで判定する。
+		if (-normalSpeed >= settings_.squashMinSpeed) {
 			squashNormal_ = normal;
 			squashTimer_ = settings_.squashTime;
 		}

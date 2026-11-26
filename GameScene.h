@@ -122,6 +122,10 @@ private:
 	std::chrono::steady_clock::time_point previousTime_{};
 	float snowPhysicsAccumulator_ = 0.0f;
 	float hitStopRemainingSeconds_ = 0.0f;
+	// 雪玉の山で衝突が連鎖すると、ヒットストップが明けるたびに次が入って重く見える。
+	// 雪玉同士のヒットストップは一度入れたらこの秒数は入れない。
+	float snowHitStopCooldown_ = 0.0f;
+	static constexpr float kSnowHitStopCooldown = 0.25f;
 	SnowEffectFeedbackSettings snowEffectFeedbackSettings_{};
 	BossFeedbackSettings bossFeedbackSettings_{};
 	int previousBossHp_ = 0;

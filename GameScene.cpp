@@ -264,6 +264,7 @@ void GameScene::Initialize() {
 	previousTime_ = std::chrono::steady_clock::now();
 	snowPhysicsAccumulator_ = 0.0f;
 	hitStopRemainingSeconds_ = 0.0f;
+	snowHitStopCooldown_ = 0.0f;
 	ending_ = Ending::kNone;
 	endingTimer_ = 0.0f;
 	defeatChain_.clear();
@@ -327,6 +328,8 @@ void GameScene::Update() {
 	if (deltaTime <= 0.0f) {
 		return;
 	}
+	// ヒットストップ中も実時間で減らす。
+	snowHitStopCooldown_ = (std::max)(0.0f, snowHitStopCooldown_ - deltaTime);
 	if (UpdateHitStop(deltaTime)) {
 		// 世界の時間だけ止める。揺れは実フレームで進め、粒の描画状態は保持する。
 		effects_->Update(0.0f);
@@ -598,7 +601,10 @@ void GameScene::RequestSnowEffectFeedback(const Snow::EffectEvent& event) {
 		scaleBySpeed = true;
 		break;
 	case Snow::EffectType::kSnowHit:
-		stopSeconds = snowEffectFeedbackSettings_.snowHitStopSeconds;
+		if (snowHitStopCooldown_ <= 0.0f) {
+			stopSeconds = snowEffectFeedbackSettings_.snowHitStopSeconds;
+			snowHitStopCooldown_ = kSnowHitStopCooldown;
+		}
 		shakeAmplitude = snowEffectFeedbackSettings_.snowShakeAmplitude;
 		scaleBySpeed = true;
 		break;

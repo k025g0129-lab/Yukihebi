@@ -39,7 +39,7 @@ public:
 		float playerRestitution = 0.0f; // Playerに押されたときの反発
 		float squashAmount = 0.35f;
 		float squashTime = 0.09f;
-		float squashImpulse = 0.4f;
+		float squashMinSpeed = 1.0f; // 面へこれ以上の速さで当たったときだけつぶす。乗っているだけの沈み込みでは反応しない
 
 
 		float snowRestitution = 0.25f; // 雪玉同士の反発
