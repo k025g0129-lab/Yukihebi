@@ -138,7 +138,7 @@ void Boss::BehaviorUpdate() {
 	}
 }
 
-Behavior Boss::BehaviorLottery() { 
+Behavior Boss::BehaviorLottery() {
 	std::vector<Behavior> candidates;
 
 	//突進
@@ -150,9 +150,7 @@ Behavior Boss::BehaviorLottery() {
 	//薙ぎ払い
 	if (IsCanSweeping()) {
 		candidates.push_back(Behavior::kSweeping);
-	
 	}
-
 
 
 	return candidates[std::rand() % candidates.size()];
@@ -217,10 +215,8 @@ void Boss::TrackingWalkUpdate() {
 
 	//尻尾
 	TailsTrackingUpdate();
-
-TrackingWalkTime ) {
+	if (trackingWalkT >= kMaxTrackingWalkTime) {
 		behaviorRequest_ = BehaviorLottery();
-
 	}
 }
 
@@ -374,13 +370,12 @@ void Boss::SweepingAttackUpdate() {
 	if (t >= 1.0f) {
 		behaviorRequest_ = BehaviorLottery();
 	}
-
 }
 
 bool Boss::IsCanSweeping() {
 	if (bossTails_.size() < kMaxSweepingMustTail) {
 		return false;
-	}	
+	}
 
 	Vector3 playerPos = player_->GetWorldTransform().translation_;
 
@@ -390,15 +385,13 @@ bool Boss::IsCanSweeping() {
 	float distance = std::sqrtf(dx * dx + dz * dz);
 
 	float attackTailRange = static_cast<float>(bossTails_.size()) * tailInterval + kTailRadius;
-	
+
 	if (distance > attackTailRange) {
 		return false;
 	}
 
 
 	return true;
-	; 
-
 }
 
 bool Boss::AddTail() {
