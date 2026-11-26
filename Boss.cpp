@@ -145,6 +145,26 @@ void Boss::BehaviorUpdate() {
 
 }
 
+Behavior Boss::BehaviorLottery() { 
+	std::vector<Behavior> candidates;
+
+	//突進
+	candidates.push_back(Behavior::kTrackingWalk);
+
+	//突撃
+	candidates.push_back(Behavior::kRush);
+
+	//薙ぎ払い
+	if (IsCanSweeping()) {
+		candidates.push_back(Behavior::kSweeping);
+	
+	}
+
+
+
+	return candidates[std::rand() % candidates.size()];
+}
+
 void Boss::FaceTowardPlayer() {
 
 	//顔をプレイヤーの方向に徐々に向けさせる
@@ -212,7 +232,7 @@ void Boss::TrackingWalkUpdate() {
 	TailsTrackingUpdate();
 
 	if (trackingWalkT >kMaxTrackingWalkTime ) {
-		behaviorRequest_ = Behavior::kSweeping;
+		behaviorRequest_ = BehaviorLottery();
 	}
 
 }
@@ -254,7 +274,7 @@ void Boss::RushUpdate() {
 		if (rushT > kMaxRushTime) {
 			rushAttack = FaceTowardCharge;
 			rushT = 0.0f;
-			behaviorRequest_ = Behavior::kTrackingWalk;
+			behaviorRequest_ = BehaviorLottery();
 		}
 		break;
 	}
@@ -372,6 +392,34 @@ void Boss::SweepingAttackUpdate() {
 
 		nextFanAngle += fanAngle;
 	}
+
+	if (t >= 1.0f) {
+		behaviorRequest_ = BehaviorLottery();
+	}
+
+}
+
+bool Boss::IsCanSweeping() {
+	if (bossTails_.size() < kMaxSweepingMustTail) {
+		return false;
+	}	
+
+	Vector3 playerPos = player_->GetWorldTransform().translation_;
+
+	float dx = worldTransform_.translation_.x - playerPos.x;
+	float dz = worldTransform_.translation_.z - playerPos.z;
+
+	float distance = std::sqrtf(dx * dx + dz * dz);
+
+	float attackTailRange = static_cast<float>(bossTails_.size()) * tailInterval + kTailRadius;
+	
+	if (distance > attackTailRange) {
+		return false;
+	}
+
+
+	return true;
+	; 
 
 }
 

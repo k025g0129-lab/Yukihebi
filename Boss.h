@@ -12,6 +12,7 @@
 #include <cstdlib>
 #include "GameMath.h"
 
+
 #include <cmath>
 #include "BossTail.h"
 
@@ -61,6 +62,7 @@ public:
 	//ビヘイビア
 	void BehaviorRequest();
 	void BehaviorUpdate();
+	Behavior BehaviorLottery();
 
 	//追従
 	void FaceTowardPlayer();
@@ -77,6 +79,8 @@ public:
 	void SweepingUpdate(); 
 	void TailsFanUpdate();
 	void SweepingAttackUpdate();
+	bool IsCanSweeping();
+	
 
 	//尻尾
 	bool AddTail();
@@ -91,7 +95,7 @@ public:
 		if (damage <= 0 || IsDead()) {
 			return false;
 		}
-		hp_ = (std::max)(0, hp_ - damage);
+
 		return true;
 	}
 
@@ -123,6 +127,8 @@ private:
 	//状態
 	Behavior behavior_;
 	Behavior behaviorRequest_;
+
+
 
 	//基本変数設定
 	const Camera* camera_ = nullptr;
@@ -174,6 +180,7 @@ private:
 	static inline const float kMaxSweepingChargeTime = 2.0f;
 	static inline const float kMaxSweepingAttackTime = 2.0f;
 	float sweepingStartAngle = 0.0f;
+	static inline const float kMaxSweepingMustTail = 6;
 
 	//尻尾
 	Model* tailModel_ = nullptr;
