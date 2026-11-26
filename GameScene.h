@@ -104,6 +104,7 @@ private:
 	void UpdateEnding(float deltaTime);
 
 	enum class Ending { kNone, kBossDefeated, kPlayerDefeated };
+
 	Ending ending_ = Ending::kNone;
 	float endingTimer_ = 0.0f;
 	std::vector<Vector3> defeatChain_; // 撃破時に順に爆ぜる尻尾の位置
@@ -150,4 +151,5 @@ private:
 	/// <summary>ステージ全体を1方向から照らす平行光源を設定する。</summary>
 	void InitializeDirectionalLight();
 	void UpdateLighting();
+	bool firstPerson = false;
 };

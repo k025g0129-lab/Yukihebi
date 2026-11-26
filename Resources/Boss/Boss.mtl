@@ -1,7 +1,7 @@
-# Blender 5.1.1 MTL File: 'yukihebi.blend'
+# Blender 5.0.1 MTL File: 'Boss.blend'
 # www.blender.org
 
-newmtl マテリアル
+newmtl Material
 Ns 250.000000
 Ka 1.000000 1.000000 1.000000
 Ks 0.500000 0.500000 0.500000

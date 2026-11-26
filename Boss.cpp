@@ -6,7 +6,6 @@ Boss::Boss() = default;
 Boss::~Boss() = default;
 
 void Boss::Initialize(Model* model, Model* tailModel, const Camera* camera, Player* player) {
-
 	behavior_ = Behavior::kTrackingWalk;
 	behaviorRequest_ = Behavior::kUnknown;
 
@@ -58,7 +57,6 @@ void Boss::Initialize(Model* model, Model* tailModel, const Camera* camera, Play
 }
 
 void Boss::Update(float deltaTime) {
-
 	if (deltaTime <= 0.0f || IsDead()) {
 		return;
 	}
@@ -84,7 +82,7 @@ void Boss::Update(float deltaTime) {
 }
 
 void Boss::Draw() {
-	mouth.Draw();
+	//mouth.Draw();
 	model_->Draw(worldTransform_, *camera_, &color_);
 
 	for (std::unique_ptr<BossTail>& tail : bossTails_) {
@@ -93,10 +91,9 @@ void Boss::Draw() {
 }
 
 void Boss::BehaviorRequest() {
-
 	if (behaviorRequest_ != Behavior::kUnknown) {
 		behavior_ = behaviorRequest_;
-		
+
 		switch (behavior_) {
 		case Behavior::kTrackingWalk:
 			TrackingWalkInitialize();
@@ -115,14 +112,12 @@ void Boss::BehaviorRequest() {
 		default:
 			break;
 		}
-	
+
 		behaviorRequest_ = Behavior::kUnknown;
 	}
-
 }
 
 void Boss::BehaviorUpdate() {
-
 	switch (behavior_) {
 	case Behavior::kTrackingWalk:
 		TrackingWalkUpdate();
@@ -141,12 +136,9 @@ void Boss::BehaviorUpdate() {
 	default:
 		break;
 	}
-
-
 }
 
 void Boss::FaceTowardPlayer() {
-
 	//顔をプレイヤーの方向に徐々に向けさせる
 
 	Vector3 playerPos = player_->GetVector3();
@@ -169,7 +161,6 @@ void Boss::FaceTowardPlayer() {
 
 
 void Boss::NotFaceTowardPlayer() {
-
 	// 顔をプレイヤーの逆方向に徐々に向けさせる
 
 	Vector3 playerPos = player_->GetVector3();
@@ -179,27 +170,23 @@ void Boss::NotFaceTowardPlayer() {
 	float dz = playerPos.z - worldTransform_.translation_.z;
 
 	if (dx * dx + dz * dz <= 0.01f) {
-
 		return;
 	}
 
-	float targetAngle = std::atan2( -dx, -dz);
+	float targetAngle = std::atan2(-dx, -dz);
 	turnAngle = targetAngle - worldTransform_.rotation_.y;
 	turnAngle = std::atan2(std::sinf(turnAngle), std::cosf(turnAngle));
-	turnAngle = std::clamp(turnAngle, -kMaxTurnAngle /2.0f, kMaxTurnAngle /2.0f);
+	turnAngle = std::clamp(turnAngle, -kMaxTurnAngle / 2.0f, kMaxTurnAngle / 2.0f);
 
 	worldTransform_.rotation_.y += turnAngle;
-
-
 }
 
-void Boss::TrackingWalkInitialize() { 
+void Boss::TrackingWalkInitialize() {
 	trackingWalkT = 0.0f;
-
 }
 
 void Boss::TrackingWalkUpdate() {
-	trackingWalkT += 1.0f/60.0f;
+	trackingWalkT += 1.0f / 60.0f;
 
 	//顔の向きを徐々にプレイヤーに向ける
 	FaceTowardPlayer();
@@ -211,19 +198,17 @@ void Boss::TrackingWalkUpdate() {
 	//尻尾
 	TailsTrackingUpdate();
 
-	if (trackingWalkT >kMaxTrackingWalkTime ) {
+	if (trackingWalkT > kMaxTrackingWalkTime) {
 		behaviorRequest_ = Behavior::kSweeping;
 	}
-
 }
 
-void Boss::RushInitialize() { 
-	rushT = 0; 
-	rushAttack = RushAttack::FaceTowardCharge;
-
+void Boss::RushInitialize() {
+	rushT = 0;
+	rushAttack = FaceTowardCharge;
 }
+
 void Boss::RushUpdate() {
-
 	//突撃内容を変える,以下は旧
 
 	rushT += 1.0f / 60.0f;
@@ -260,13 +245,12 @@ void Boss::RushUpdate() {
 	}
 }
 
-void Boss::SweepingInitialize() { 
-	sweepingAttack = SweepingAttack::FaceTowardFanCharge;
+void Boss::SweepingInitialize() {
+	sweepingAttack = FaceTowardFanCharge;
 	sweepingT = 0.0f;
-
 }
 
-void Boss::SweepingUpdate() { 
+void Boss::SweepingUpdate() {
 	sweepingT += 1.0f / 60.0f;
 
 	switch (sweepingAttack) {
@@ -277,16 +261,14 @@ void Boss::SweepingUpdate() {
 		if (sweepingT > kMaxSweepingChargeTime) {
 			sweepingStartAngle = worldTransform_.rotation_.y;
 			sweepingT = 0.0f;
-			sweepingAttack = SweepingAttack::Attack;
+			sweepingAttack = Attack;
 		}
 
 		break;
 	case Attack:
 		SweepingAttackUpdate();
 		break;
-
 	}
-
 }
 
 void Boss::TailsFanUpdate() {
@@ -301,7 +283,6 @@ void Boss::TailsFanUpdate() {
 	Vector3 targetPrevPos = worldTransform_.translation_;
 
 	for (std::unique_ptr<BossTail>& tail : bossTails_) {
-
 		//現在の尻尾の位置
 		Vector3 ordPos = tail->GetPos();
 
@@ -312,8 +293,8 @@ void Boss::TailsFanUpdate() {
 		float currentAngle = toNextAngle;
 
 		//保険
-		if (dx * dx + dz * dz > 0.001f){
-			currentAngle = std::atan2(dx,dz);
+		if (dx * dx + dz * dz > 0.001f) {
+			currentAngle = std::atan2(dx, dz);
 		}
 
 		//角度の差
@@ -323,7 +304,7 @@ void Boss::TailsFanUpdate() {
 		currentAngle += angleDiff * lerpT;
 
 		//計算
-		Vector3 pos =targetPrevPos;
+		Vector3 pos = targetPrevPos;
 		pos.x += std::sinf(currentAngle) * tailInterval;
 		pos.z += std::cosf(currentAngle) * tailInterval;
 
@@ -339,13 +320,9 @@ void Boss::TailsFanUpdate() {
 
 		toNextAngle += kTailsFanAngle;
 	}
-
-
-
 }
 
 void Boss::SweepingAttackUpdate() {
-
 	//イージングT
 	float t = std::clamp(sweepingT / kMaxSweepingAttackTime, 0.0f, 1.0f);
 	t = Ease::EaseInOutBack(t);
@@ -360,7 +337,6 @@ void Boss::SweepingAttackUpdate() {
 	Vector3 pos = worldTransform_.translation_;
 
 	for (std::unique_ptr<BossTail>& tail : bossTails_) {
-
 		pos.x += std::sinf(nextFanAngle) * tailInterval;
 		pos.z += std::cosf(nextFanAngle) * tailInterval;
 
@@ -372,7 +348,6 @@ void Boss::SweepingAttackUpdate() {
 
 		nextFanAngle += fanAngle;
 	}
-
 }
 
 bool Boss::AddTail() {
@@ -392,10 +367,10 @@ bool Boss::AddTail() {
 }
 
 bool Boss::TryEatSnow() {
-	return !IsDead() && AddTail(); }
+	return !IsDead() && AddTail();
+}
 
 void Boss::TailsTrackingUpdate() {
-
 	// 尻尾
 	Footprint footprint;
 	footprint.pos = worldTransform_.translation_;
@@ -409,7 +384,6 @@ void Boss::TailsTrackingUpdate() {
 	auto it = footprints_.begin();
 
 	for (std::unique_ptr<BossTail>& tail : bossTails_) {
-
 		// kTailIntervalフレーム分、過去の足跡へ移動
 		std::advance(it, kTailInterval);
 
@@ -419,12 +393,9 @@ void Boss::TailsTrackingUpdate() {
 		// 尻尾を更新
 		tail->Update();
 	}
-
-
 }
 
 void Boss::CheckSelfCollision() {
-
 	if (selfCollisionAgeSeconds_ < kInitialSelfCollisionDelaySeconds ||
 		selfHitCooldownRemaining_ > 0.0f) {
 		return;
@@ -445,8 +416,8 @@ void Boss::CheckSelfCollision() {
 		// 接触面へ向かう速度を使い、かすめた接触や離れている接触では傷つかない。
 		const float impactSpeed = distanceSquared > 0.000001f
 
-			? (std::max)(0.0f, -Dot(velocity_, offset / std::sqrt(distanceSquared)))
-			: Length(velocity_);
+			                          ? (std::max)(0.0f, -Dot(velocity_, offset / std::sqrt(distanceSquared)))
+			                          : Length(velocity_);
 
 		if (impactSpeed < kMinSelfImpactSpeed) {
 			continue;

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "KamataEngine.h"
 using namespace KamataEngine;
@@ -50,6 +50,10 @@ public:
 	// 追従対象とカメラの座標の差
 	Vector3 targetOffset_ = {0, 30.0f, -5.0f};
 	void SetCamera(Camera* camera) { camera_ = camera; }
+	// 戦闘演出など、外部で計算した揺れも最終位置へまとめて適用する。
+	void SetExternalOffset(const Vector3& offset) { externalOffset_ = offset; }
+	// 階層ごとの床の高さ。表示範囲はこの平面との交点から求める。
+	void SetGroundHeight(float height) { groundHeight_ = height; }
 
 	struct Rect {
 		float left = 0.0f;
@@ -58,6 +62,7 @@ public:
 		float bottom = 0.0f;
 	};
 
+	// X/Z平面の範囲。left/right はX、bottom/top はZを表す。
 	Rect movableArea_ = {0, 100, 0, 100};
 
 	void SetMovableArea(const Rect& area) { movableArea_ = area; }
@@ -84,6 +89,8 @@ private:
 	// 揺れ・反動・寄りをまとめて足した最終位置をカメラへ反映し、反動と寄りを減衰させる。
 	void ApplyCameraOffsets(const Vector3& basePosition);
 	Vector3 followPosition_{};
+	Vector3 externalOffset_{};
+	float groundHeight_ = 0.0f;
 	// ジャンプ中に小さな上下動を追わないための仮想の注視点。
 	float playerFocusY_ = 0.0f;
 	float playerVerticalFocusMargin_ = 3.0f;

@@ -1,4 +1,4 @@
-#include "CameraController.h"
+﻿#include "CameraController.h"
 
 #include <algorithm>
 #include <cmath>
@@ -49,10 +49,14 @@ void CameraController::UpdateShakeOnly(const Vector3& basePosition) {
 }
 
 void CameraController::ApplyCameraOffsets(const Vector3& basePosition) {
+	// リサイズ後の描画バッファに合わせてから表示範囲と射影行列を計算する。
+	auto* graphics = DirectXCommon::GetInstance();
+	camera_->aspectRatio = static_cast<float>(graphics->GetBackBufferWidth()) /
+	    static_cast<float>((std::max)(1, graphics->GetBackBufferHeight()));
 	// 寄りは高さだけを下げる。下げた高さで範囲制限するので、画面端はマップの外へ出ない。
 	const Vector3 zoomOffset{0.0f, -zoomPunch_, 0.0f};
 	// 反動と揺れも含めた最終位置を制限し、画面端がマップの外へ出ないようにする。
-	camera_->translation_ = ClampToMovableArea(basePosition + impactKickOffset_ + zoomOffset + Shake());
+	camera_->translation_ = ClampToMovableArea(basePosition + externalOffset_ + impactKickOffset_ + zoomOffset + Shake());
 	impactKickOffset_ *= impactKickRetention_;
 	if (LengthSquared(impactKickOffset_) < 0.0001f) {
 		impactKickOffset_ = {};
@@ -81,6 +85,7 @@ void CameraController::Reset() {
 	shakeRemainingFrames_ = 0.0f;
 	impactKickOffset_ = {};
 	zoomPunch_ = 0.0f;
+	externalOffset_ = {};
 	camera_->UpdateMatrix();
 
 	camera_->TransferMatrix();
@@ -89,7 +94,7 @@ void CameraController::Reset() {
 Vector3 CameraController::ClampToMovableArea(const Vector3& position) const {
 	Vector3 clamped = position;
 
-	const float height = position.y; // 地面Y=0からの高さ
+	const float height = position.y - groundHeight_; // 現在の階の床からの高さ
 	const float angle = camera_->rotation_.x;
 	const float tanHalfY = std::tan(camera_->fovAngleY * 0.5f);
 	const float tanHalfX = tanHalfY * camera_->aspectRatio;
